@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
 
 export type BallEntity = {
   sprite: Phaser.GameObjects.Arc;
@@ -7,10 +7,15 @@ export type BallEntity = {
 };
 
 export function createBall(scene: Phaser.Scene): BallEntity {
-  const { width, height } = PROTOTYPE_CONFIG.arena;
+  const field = getFieldBounds();
   const cfg = PROTOTYPE_CONFIG.ball;
 
-  const sprite = scene.add.circle(width / 2, height / 2, cfg.radius, cfg.color);
+  const sprite = scene.add.circle(
+    field.centerX,
+    field.centerY,
+    cfg.radius,
+    cfg.color,
+  );
   sprite.setStrokeStyle(2, cfg.strokeColor);
   sprite.setDepth(11);
 

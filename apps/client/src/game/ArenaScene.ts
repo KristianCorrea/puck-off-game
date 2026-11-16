@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "./config/prototypeConfig";
+import { PROTOTYPE_CONFIG, getFieldBounds } from "./config/prototypeConfig";
 import { createBall, type BallEntity } from "./entities/createBall";
 import {
   ballInGoalSide,
@@ -27,30 +27,28 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { width, height, floorColor, backgroundColor } =
-      PROTOTYPE_CONFIG.arena;
+    const { width, height, backgroundColor } = PROTOTYPE_CONFIG.arena;
+    const field = getFieldBounds();
 
     this.cameras.main.setBackgroundColor(backgroundColor);
     this.matter.world.setBounds(0, 0, width, height, 0, false, false, false, false);
     this.matter.world.disableGravity();
 
-    this.add
-      .rectangle(width / 2, height / 2, width, height, floorColor)
-      .setDepth(0);
-
-    const mid = this.add.graphics().setDepth(1);
-    mid.lineStyle(2, 0x2a3f5f, 0.8);
-    mid.lineBetween(width / 2, 0, width / 2, height);
-    mid.strokeCircle(width / 2, height / 2, 56);
-
     createWalls(this);
     this.goals = createGoals(this);
+
+    // Midfield markings on the pitch
+    const mid = this.add.graphics().setDepth(1);
+    mid.lineStyle(2, 0x2a3f5f, 0.8);
+    mid.lineBetween(field.centerX, 0, field.centerX, height);
+    mid.strokeCircle(field.centerX, field.centerY, 56);
+
     this.ball = createBall(this);
     this.puck = createPuck(this);
     this.flick = new FlickController(this, this.puck);
 
     this.statusText = this.add
-      .text(16, 12, "Drag the teal puck, release to flick", {
+      .text(field.left + 16, 12, "Drag the teal puck, release to flick", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "15px",
         color: "#b8c9e0",
@@ -59,7 +57,7 @@ export class ArenaScene extends Phaser.Scene {
       .setDepth(30);
 
     this.add
-      .text(width - 16, 12, "Phase 1 — physics prototype", {
+      .text(field.right - 16, 12, "Phase 1 — physics prototype", {
         fontFamily: "system-ui, sans-serif",
         fontSize: "13px",
         color: "#6b84a3",
@@ -73,7 +71,6 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   update(): void {
-    // Sprites are Matter game objects — Phaser syncs transform; still dampen settle.
     this.dampenIfSettling(this.puck.body);
     this.dampenIfSettling(this.ball.body);
     this.watchGoalSensors();
@@ -99,8 +96,8 @@ export class ArenaScene extends Phaser.Scene {
 
     const msg =
       side === "player1"
-        ? "Ball in P1 goal zone (own-goal side for P1)"
-        : "Ball in P2 goal zone";
+        ? "Ball in P1 goal pocket"
+        : "Ball in P2 goal pocket";
     if (msg !== this.lastGoalLog) {
       this.lastGoalLog = msg;
       this.statusText.setText(msg);

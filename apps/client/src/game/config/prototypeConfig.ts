@@ -3,7 +3,8 @@
  */
 export const PROTOTYPE_CONFIG = {
   arena: {
-    width: 1100,
+    /** Full canvas including recessed goal pockets on left/right */
+    width: 1240,
     height: 640,
     wallThickness: 28,
     cornerRadius: 0,
@@ -14,10 +15,13 @@ export const PROTOTYPE_CONFIG = {
 
   goal: {
     openingHeight: 200,
-    depth: 36,
-    sensorPadding: 8,
+    /** Recessed pocket depth (Soccer Stars–style cage behind the mouth) */
+    depth: 78,
+    postThickness: 18,
+    sensorPadding: 10,
     color: 0xf4a261,
-    sensorAlpha: 0.2,
+    netColor: 0xc9783a,
+    sensorAlpha: 0.22,
   },
 
   puck: {
@@ -28,6 +32,7 @@ export const PROTOTYPE_CONFIG = {
     friction: 0.04,
     frictionAir: 0.02,
     restitution: 0.55,
+    /** Fraction across the playable field (not including goal pockets) */
     startXRatio: 0.22,
     startYRatio: 0.5,
   },
@@ -59,3 +64,21 @@ export const PROTOTYPE_CONFIG = {
 } as const;
 
 export type GoalSide = "player1" | "player2";
+
+/** Playable pitch between the recessed goal pockets. */
+export function getFieldBounds() {
+  const { width, height } = PROTOTYPE_CONFIG.arena;
+  const depth = PROTOTYPE_CONFIG.goal.depth;
+  const left = depth;
+  const right = width - depth;
+  return {
+    left,
+    right,
+    top: 0,
+    bottom: height,
+    width: right - left,
+    height,
+    centerX: (left + right) / 2,
+    centerY: height / 2,
+  };
+}

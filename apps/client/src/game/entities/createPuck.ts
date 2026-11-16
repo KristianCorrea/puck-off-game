@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
 
 export type PuckEntity = {
   sprite: Phaser.GameObjects.Arc;
@@ -7,10 +7,10 @@ export type PuckEntity = {
 };
 
 export function createPuck(scene: Phaser.Scene): PuckEntity {
-  const { width, height } = PROTOTYPE_CONFIG.arena;
+  const field = getFieldBounds();
   const cfg = PROTOTYPE_CONFIG.puck;
-  const x = width * cfg.startXRatio;
-  const y = height * cfg.startYRatio;
+  const x = field.left + field.width * cfg.startXRatio;
+  const y = field.top + field.height * cfg.startYRatio;
 
   const sprite = scene.add.circle(x, y, cfg.radius, cfg.color);
   sprite.setStrokeStyle(3, cfg.strokeColor);
