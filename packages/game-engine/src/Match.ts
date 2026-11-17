@@ -148,12 +148,17 @@ export class Match {
   }
 
   /**
-   * Fixed-timestep physics while in PHYSICS_RESOLUTION.
-   * On goal: enters GOAL_RESOLUTION (ball stays in pocket until completeGoalResolution).
+   * Fixed-timestep physics while resolving a shot (and during goal celebration play-through).
+   * On goal: scores once, enters GOAL_RESOLUTION, keeps velocities (client celebrates while
+   * bodies keep moving until completeGoalResolution).
    * On settle: ejects pocketed pucks and advances turn.
    */
   step(deltaMs: number): StepResult {
-    if (!this.started || this.phase !== "PHYSICS_RESOLUTION") {
+    if (
+      !this.started ||
+      (this.phase !== "PHYSICS_RESOLUTION" &&
+        this.phase !== "GOAL_RESOLUTION")
+    ) {
       return { state: this.getState(), events: [], shotComplete: false };
     }
 
@@ -163,13 +168,15 @@ export class Match {
 
     this.stepAccumulatorMs += Math.max(0, deltaMs);
 
-    while (
-      this.phase === "PHYSICS_RESOLUTION" &&
-      this.stepAccumulatorMs >= stepMs
-    ) {
+    while (this.stepAccumulatorMs >= stepMs) {
       this.stepAccumulatorMs -= stepMs;
       world.stepOnce();
       this.physicsElapsedMs += stepMs;
+
+      // Celebration play-through — no re-score / settle; just keep animating.
+      if (this.phase === "GOAL_RESOLUTION") {
+        continue;
+      }
 
       const goalSide = pointInGoalSide(
         world.ball.position.x,
@@ -187,12 +194,7 @@ export class Match {
           this.result = winner;
         }
 
-        // Freeze motion for celebration — client calls completeGoalResolution().
-        for (const body of world.allDynamicBodies()) {
-          Body.setVelocity(body, { x: 0, y: 0 });
-          Body.setAngularVelocity(body, 0);
-        }
-
+        // Keep velocities — ball plays into the net during celebration.
         return { state: this.getState(), events, shotComplete: true };
       }
 

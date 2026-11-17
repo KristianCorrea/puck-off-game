@@ -181,6 +181,10 @@ export class MatchController {
   }
 
   private updateGoalResolution(deltaMs: number): void {
+    // Keep stepping so the ball plays through the net during celebration.
+    const stepped = this.engine.step(deltaMs);
+    this.syncFromEngine(stepped.state, { paintBodies: true });
+
     this.goalPauseMs -= deltaMs;
     if (this.goalPauseMs > 0) return;
 
@@ -264,7 +268,10 @@ export class MatchController {
       });
     }
 
-    if (state.phase === "PHYSICS_RESOLUTION") {
+    if (
+      state.phase === "PHYSICS_RESOLUTION" ||
+      state.phase === "GOAL_RESOLUTION"
+    ) {
       this.fx.observeMotion(samples);
     }
   }
