@@ -30,36 +30,41 @@ const cageOpts = {
 /**
  * Recessed goals with solid cages.
  * Score / eject zone = entire region from the pitch-side mouth line
- * through the pocket to the back board (user’s “beyond the red line”).
+ * through the pocket to the back board.
  */
 export function createGoals(scene: Phaser.Scene): GoalSensors {
-  const { height, wallThickness } = PROTOTYPE_CONFIG.arena;
+  const { wallThickness } = PROTOTYPE_CONFIG.arena;
   const { openingHeight, depth, postThickness, color, netColor, sensorAlpha } =
     PROTOTYPE_CONFIG.goal;
   const field = getFieldBounds();
   const matter = scene.matter;
 
-  const mouthTop = (height - openingHeight) / 2;
+  const mouthTop = field.centerY - openingHeight / 2;
   const mouthBottom = mouthTop + openingHeight;
 
-  // Posts sit outside the mouth so opening matches the wall gap
   const topPostY = mouthTop - postThickness / 2;
   const bottomPostY = mouthBottom + postThickness / 2;
 
   // --- Left cage (P1) ---
   matter.add.rectangle(
     postThickness / 2,
-    height / 2,
+    field.centerY,
     postThickness,
     openingHeight + postThickness * 2,
     cageOpts,
   );
   matter.add.rectangle(depth / 2, topPostY, depth, postThickness, cageOpts);
   matter.add.rectangle(depth / 2, bottomPostY, depth, postThickness, cageOpts);
-  matter.add.rectangle(depth / 2, wallThickness / 2, depth, wallThickness, cageOpts);
   matter.add.rectangle(
     depth / 2,
-    height - wallThickness / 2,
+    field.top + wallThickness / 2,
+    depth,
+    wallThickness,
+    cageOpts,
+  );
+  matter.add.rectangle(
+    depth / 2,
+    field.bottom - wallThickness / 2,
     depth,
     wallThickness,
     cageOpts,
@@ -68,7 +73,7 @@ export function createGoals(scene: Phaser.Scene): GoalSensors {
   // --- Right cage (P2) ---
   matter.add.rectangle(
     field.right + depth - postThickness / 2,
-    height / 2,
+    field.centerY,
     postThickness,
     openingHeight + postThickness * 2,
     cageOpts,
@@ -89,24 +94,19 @@ export function createGoals(scene: Phaser.Scene): GoalSensors {
   );
   matter.add.rectangle(
     field.right + depth / 2,
-    wallThickness / 2,
+    field.top + wallThickness / 2,
     depth,
     wallThickness,
     cageOpts,
   );
   matter.add.rectangle(
     field.right + depth / 2,
-    height - wallThickness / 2,
+    field.bottom - wallThickness / 2,
     depth,
     wallThickness,
     cageOpts,
   );
 
-  /**
-   * Full goal zones:
-   * - Left: from just inside the back board → through pocket → across wall mouth to pitch face
-   * - Right: from pitch face of wall mouth → through pocket → just before back board
-   */
   const zones: Record<GoalSide, GoalZone> = {
     player1: {
       minX: postThickness,
@@ -139,24 +139,6 @@ export function createGoals(scene: Phaser.Scene): GoalSensors {
     fieldRight: field.right,
     zones,
   });
-
-  scene.add
-    .text(field.left + wallThickness + 10, height / 2, "P1", {
-      fontFamily: "system-ui, sans-serif",
-      fontSize: "14px",
-      color: "#f4a261",
-    })
-    .setOrigin(0, 0.5)
-    .setDepth(5);
-
-  scene.add
-    .text(field.right - wallThickness - 10, height / 2, "P2", {
-      fontFamily: "system-ui, sans-serif",
-      fontSize: "14px",
-      color: "#f4a261",
-    })
-    .setOrigin(1, 0.5)
-    .setDepth(5);
 
   return { player1, player2, zones };
 }
@@ -209,14 +191,17 @@ function drawGoalVisuals(
 
   const g = scene.add.graphics().setDepth(3);
 
-  // Net fill — full opening height in the pocket
-  g.fillStyle(netColor, 0.35);
+  g.fillStyle(netColor, 0.4);
   g.fillRect(postThickness, mouthTop, depth - postThickness, openingHeight);
   g.fillRect(fieldRight, mouthTop, depth - postThickness, openingHeight);
 
-  // Cage posts flush with wall ends (outside the mouth)
-  g.fillStyle(color, 0.95);
-  g.fillRect(0, mouthTop - postThickness, postThickness, openingHeight + postThickness * 2);
+  g.fillStyle(color, 0.98);
+  g.fillRect(
+    0,
+    mouthTop - postThickness,
+    postThickness,
+    openingHeight + postThickness * 2,
+  );
   g.fillRect(0, mouthTop - postThickness, depth, postThickness);
   g.fillRect(0, mouthBottom, depth, postThickness);
   g.fillRect(
@@ -228,20 +213,22 @@ function drawGoalVisuals(
   g.fillRect(fieldRight, mouthTop - postThickness, depth, postThickness);
   g.fillRect(fieldRight, mouthBottom, depth, postThickness);
 
-  // Mouth frame on the wall — exact opening
   g.lineStyle(3, color, 1);
   g.strokeRect(fieldLeft, mouthTop, wallThickness, openingHeight);
-  g.strokeRect(fieldRight - wallThickness, mouthTop, wallThickness, openingHeight);
+  g.strokeRect(
+    fieldRight - wallThickness,
+    mouthTop,
+    wallThickness,
+    openingHeight,
+  );
 
-  // Tint the real score/eject zones (full mouth + pocket)
   g.fillStyle(color, sensorAlpha);
   for (const side of ["player1", "player2"] as GoalSide[]) {
     const z = zones[side];
     g.fillRect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY);
   }
 
-  // Net lines
-  g.lineStyle(1, 0xffe0c2, 0.35);
+  g.lineStyle(1, 0xfff3c4, 0.4);
   const netStep = 14;
   for (let x = postThickness + netStep; x < depth - 2; x += netStep) {
     g.lineBetween(x, mouthTop, x, mouthBottom);
@@ -249,7 +236,11 @@ function drawGoalVisuals(
   for (let y = mouthTop + netStep; y < mouthBottom; y += netStep) {
     g.lineBetween(postThickness, y, depth - 2, y);
   }
-  for (let x = fieldRight + netStep; x < fieldRight + depth - postThickness; x += netStep) {
+  for (
+    let x = fieldRight + netStep;
+    x < fieldRight + depth - postThickness;
+    x += netStep
+  ) {
     g.lineBetween(x, mouthTop, x, mouthBottom);
   }
   for (let y = mouthTop + netStep; y < mouthBottom; y += netStep) {

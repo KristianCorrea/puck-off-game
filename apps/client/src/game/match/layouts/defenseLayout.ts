@@ -9,11 +9,11 @@ export type SpawnPoint = { x: number; y: number };
  */
 export function getDefenseLayout(): Record<PlayerId, SpawnPoint[]> {
   const field = getFieldBounds();
-  const { left, width, height } = field;
+  const { left, top, width, height } = field;
 
   const at = (xRatio: number, yRatio: number): SpawnPoint => ({
     x: left + width * xRatio,
-    y: height * yRatio,
+    y: top + height * yRatio,
   });
 
   // P1 defends left — cluster near left goal / back half

@@ -10,13 +10,22 @@ export function createBall(scene: Phaser.Scene): BallEntity {
   const field = getFieldBounds();
   const cfg = PROTOTYPE_CONFIG.ball;
 
+  const glow = scene.add.circle(
+    field.centerX,
+    field.centerY,
+    cfg.radius + 8,
+    0xfbbf24,
+    0.18,
+  );
+  glow.setDepth(10.5);
+
   const sprite = scene.add.circle(
     field.centerX,
     field.centerY,
     cfg.radius,
     cfg.color,
   );
-  sprite.setStrokeStyle(2, cfg.strokeColor);
+  sprite.setStrokeStyle(3, cfg.strokeColor, 1);
   sprite.setDepth(11);
 
   scene.matter.add.gameObject(sprite, {
@@ -30,6 +39,15 @@ export function createBall(scene: Phaser.Scene): BallEntity {
 
   const body = sprite.body as MatterJS.BodyType;
   scene.matter.body.setMass(body, cfg.mass);
+
+  const sync = (): void => {
+    glow.setPosition(sprite.x, sprite.y);
+  };
+  scene.events.on("postupdate", sync);
+  sprite.on("destroy", () => {
+    scene.events.off("postupdate", sync);
+    glow.destroy();
+  });
 
   return { sprite, body };
 }

@@ -3,14 +3,22 @@
  */
 export const PROTOTYPE_CONFIG = {
   arena: {
-    /** Full canvas including recessed goal pockets on left/right */
+    /** Full canvas including HUD band + recessed goal pockets */
     width: 1240,
-    height: 640,
-    wallThickness: 28,
-    cornerRadius: 0,
-    backgroundColor: 0x0e1a2b,
-    floorColor: 0x152238,
-    wallColor: 0x3d5a80,
+    /** Dedicated top chrome for score / turn / clock */
+    hudHeight: 104,
+    /** Playable pitch height (below HUD) */
+    playHeight: 640,
+    /** Total canvas height = hudHeight + playHeight */
+    height: 744,
+    wallThickness: 26,
+    cornerRadius: 18,
+    backgroundColor: 0x071018,
+    floorColor: 0x0f2740,
+    floorAccent: 0x143352,
+    wallColor: 0x5ec8ff,
+    wallInner: 0x1a3a55,
+    lineColor: 0x7dd3fc,
   },
 
   goal: {
@@ -19,9 +27,9 @@ export const PROTOTYPE_CONFIG = {
     depth: 78,
     postThickness: 18,
     sensorPadding: 10,
-    color: 0xf4a261,
-    netColor: 0xc9783a,
-    sensorAlpha: 0.22,
+    color: 0xffb703,
+    netColor: 0xe09f3e,
+    sensorAlpha: 0.14,
   },
 
   puck: {
@@ -39,8 +47,8 @@ export const PROTOTYPE_CONFIG = {
 
   ball: {
     radius: 16,
-    color: 0xf8f4ec,
-    strokeColor: 0xc9c2b4,
+    color: 0xfff7ed,
+    strokeColor: 0xfbbf24,
     mass: 1.2,
     friction: 0.02,
     frictionAir: 0.015,
@@ -65,20 +73,23 @@ export const PROTOTYPE_CONFIG = {
 
 export type GoalSide = "player1" | "player2";
 
-/** Playable pitch between the recessed goal pockets. */
+/** Playable pitch between the recessed goal pockets (below the HUD band). */
 export function getFieldBounds() {
-  const { width, height } = PROTOTYPE_CONFIG.arena;
+  const { width, height, hudHeight, playHeight } = PROTOTYPE_CONFIG.arena;
   const depth = PROTOTYPE_CONFIG.goal.depth;
   const left = depth;
   const right = width - depth;
+  const top = hudHeight;
+  const bottom = height;
   return {
     left,
     right,
-    top: 0,
-    bottom: height,
+    top,
+    bottom,
     width: right - left,
-    height,
+    height: playHeight,
     centerX: (left + right) / 2,
-    centerY: height / 2,
+    centerY: top + playHeight / 2,
+    hudHeight,
   };
 }

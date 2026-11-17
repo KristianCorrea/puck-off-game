@@ -187,8 +187,8 @@ export class MatchController {
     const { wallThickness } = PROTOTYPE_CONFIG.arena;
     const margin = PROTOTYPE_CONFIG.puck.radius + 10;
     const matter = this.scene.matter;
-    const minY = wallThickness + margin;
-    const maxY = PROTOTYPE_CONFIG.arena.height - wallThickness - margin;
+    const minY = field.top + wallThickness + margin;
+    const maxY = field.bottom - wallThickness - margin;
     const inset = field.width * MATCH_CONFIG.goalEjectFieldRatio;
 
     for (const puck of this.pucks) {

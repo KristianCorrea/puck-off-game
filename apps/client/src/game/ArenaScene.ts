@@ -1,10 +1,10 @@
 import Phaser from "phaser";
-import { MATCH_CONFIG } from "./config/gameConfig";
-import { PROTOTYPE_CONFIG, getFieldBounds } from "./config/prototypeConfig";
+import { PROTOTYPE_CONFIG } from "./config/prototypeConfig";
 import { createBall } from "./entities/createBall";
 import { createGoals } from "./entities/createGoals";
 import { createPuckAt } from "./entities/createPuck";
 import { createWalls } from "./entities/createWalls";
+import { drawPitchMarkings } from "./entities/drawPitch";
 import { getDefenseLayout } from "./match/layouts/defenseLayout";
 import { MatchController } from "./match/MatchController";
 
@@ -19,20 +19,22 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { width, height, backgroundColor } = PROTOTYPE_CONFIG.arena;
-    const field = getFieldBounds();
+    const { width, height, backgroundColor, hudHeight } = PROTOTYPE_CONFIG.arena;
 
     this.cameras.main.setBackgroundColor(backgroundColor);
     this.matter.world.setBounds(0, 0, width, height, 0, false, false, false, false);
     this.matter.world.disableGravity();
 
-    createWalls(this);
-    const goals = createGoals(this);
+    // Dim frame behind / around the pitch
+    const frame = this.add.graphics().setDepth(-1);
+    frame.fillStyle(0x050b12, 1);
+    frame.fillRect(0, 0, width, height);
+    frame.fillStyle(0x0a1622, 1);
+    frame.fillRect(0, hudHeight, width, height - hudHeight);
 
-    const mid = this.add.graphics().setDepth(1);
-    mid.lineStyle(2, 0x2a3f5f, 0.8);
-    mid.lineBetween(field.centerX, 0, field.centerX, height);
-    mid.strokeCircle(field.centerX, field.centerY, 56);
+    createWalls(this);
+    drawPitchMarkings(this);
+    const goals = createGoals(this);
 
     const ball = createBall(this);
     const layout = getDefenseLayout();
@@ -64,29 +66,6 @@ export class ArenaScene extends Phaser.Scene {
         this.scene.restart();
       },
     });
-
-    this.add
-      .text(field.right - 16, height - 16, "Phase 2 — local match", {
-        fontFamily: "system-ui, sans-serif",
-        fontSize: "12px",
-        color: "#6b84a3",
-      })
-      .setOrigin(1, 1)
-      .setDepth(30);
-
-    this.add
-      .text(
-        field.left + 16,
-        height - 16,
-        `First to ${MATCH_CONFIG.maxGoals} · ${MATCH_CONFIG.turnDurationMs / 1000}s / turn`,
-        {
-          fontFamily: "system-ui, sans-serif",
-          fontSize: "12px",
-          color: "#6b84a3",
-        },
-      )
-      .setOrigin(0, 1)
-      .setDepth(30);
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.match.destroy();

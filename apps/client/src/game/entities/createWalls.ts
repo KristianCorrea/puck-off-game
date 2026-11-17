@@ -21,22 +21,34 @@ const wallOpts = {
  * Field walls with goal mouths open into recessed pockets (created in createGoals).
  */
 export function createWalls(scene: Phaser.Scene): WallBodies {
-  const { height, wallThickness, wallColor, floorColor } = PROTOTYPE_CONFIG.arena;
+  const { wallThickness, wallColor, wallInner, floorColor, floorAccent } =
+    PROTOTYPE_CONFIG.arena;
   const { openingHeight, depth, color } = PROTOTYPE_CONFIG.goal;
   const field = getFieldBounds();
   const matter = scene.matter;
 
-  const sideWallHeight = (height - openingHeight) / 2;
+  const sideWallHeight = (field.height - openingHeight) / 2;
   const halfOpen = openingHeight / 2;
 
-  // Pitch floor (between pockets)
-  scene.add
-    .rectangle(field.centerX, field.centerY, field.width, height, floorColor)
-    .setDepth(0);
+  // Pitch floor with subtle two-tone bands
+  const floor = scene.add.graphics().setDepth(0);
+  floor.fillStyle(floorColor, 1);
+  floor.fillRoundedRect(
+    field.left,
+    field.top,
+    field.width,
+    field.height,
+    8,
+  );
+  floor.fillStyle(floorAccent, 0.35);
+  const band = 48;
+  for (let y = field.top; y < field.bottom; y += band * 2) {
+    floor.fillRect(field.left, y, field.width, band);
+  }
 
   const top = matter.add.rectangle(
     field.centerX,
-    wallThickness / 2,
+    field.top + wallThickness / 2,
     field.width,
     wallThickness,
     wallOpts,
@@ -44,16 +56,15 @@ export function createWalls(scene: Phaser.Scene): WallBodies {
 
   const bottom = matter.add.rectangle(
     field.centerX,
-    height - wallThickness / 2,
+    field.bottom - wallThickness / 2,
     field.width,
     wallThickness,
     wallOpts,
   );
 
-  // Left side split around goal opening
   const leftTop = matter.add.rectangle(
     field.left + wallThickness / 2,
-    sideWallHeight / 2,
+    field.top + sideWallHeight / 2,
     wallThickness,
     sideWallHeight,
     wallOpts,
@@ -61,16 +72,15 @@ export function createWalls(scene: Phaser.Scene): WallBodies {
 
   const leftBottom = matter.add.rectangle(
     field.left + wallThickness / 2,
-    height - sideWallHeight / 2,
+    field.bottom - sideWallHeight / 2,
     wallThickness,
     sideWallHeight,
     wallOpts,
   );
 
-  // Right side split around goal opening
   const rightTop = matter.add.rectangle(
     field.right - wallThickness / 2,
-    sideWallHeight / 2,
+    field.top + sideWallHeight / 2,
     wallThickness,
     sideWallHeight,
     wallOpts,
@@ -78,49 +88,88 @@ export function createWalls(scene: Phaser.Scene): WallBodies {
 
   const rightBottom = matter.add.rectangle(
     field.right - wallThickness / 2,
-    height - sideWallHeight / 2,
+    field.bottom - sideWallHeight / 2,
     wallThickness,
     sideWallHeight,
     wallOpts,
   );
 
   const g = scene.add.graphics().setDepth(2);
+
+  // Outer neon rail
   g.fillStyle(wallColor, 1);
-
-  // Top / bottom boards
-  g.fillRect(field.left, 0, field.width, wallThickness);
-  g.fillRect(field.left, height - wallThickness, field.width, wallThickness);
-
-  // Side boards (above/below mouths)
-  g.fillRect(field.left, 0, wallThickness, sideWallHeight);
-  g.fillRect(field.left, height - sideWallHeight, wallThickness, sideWallHeight);
-  g.fillRect(field.right - wallThickness, 0, wallThickness, sideWallHeight);
+  g.fillRect(field.left, field.top, field.width, wallThickness);
   g.fillRect(
-    field.right - wallThickness,
-    height - sideWallHeight,
+    field.left,
+    field.bottom - wallThickness,
+    field.width,
+    wallThickness,
+  );
+  g.fillRect(field.left, field.top, wallThickness, sideWallHeight);
+  g.fillRect(
+    field.left,
+    field.bottom - sideWallHeight,
     wallThickness,
     sideWallHeight,
+  );
+  g.fillRect(
+    field.right - wallThickness,
+    field.top,
+    wallThickness,
+    sideWallHeight,
+  );
+  g.fillRect(
+    field.right - wallThickness,
+    field.bottom - sideWallHeight,
+    wallThickness,
+    sideWallHeight,
+  );
+
+  // Inner bevel
+  g.fillStyle(wallInner, 0.85);
+  const inset = 5;
+  g.fillRect(
+    field.left + inset,
+    field.top + inset,
+    field.width - inset * 2,
+    wallThickness - inset,
+  );
+  g.fillRect(
+    field.left + inset,
+    field.bottom - wallThickness,
+    field.width - inset * 2,
+    wallThickness - inset,
   );
 
   // Mouth edge highlights
   g.lineStyle(3, color, 0.95);
   g.strokeRect(
     field.left,
-    height / 2 - halfOpen,
+    field.centerY - halfOpen,
     wallThickness,
     openingHeight,
   );
   g.strokeRect(
     field.right - wallThickness,
-    height / 2 - halfOpen,
+    field.centerY - halfOpen,
     wallThickness,
     openingHeight,
   );
 
-  // Subtle pocket floors
-  g.fillStyle(0x101c2e, 1);
-  g.fillRect(0, height / 2 - halfOpen, depth, openingHeight);
-  g.fillRect(field.right, height / 2 - halfOpen, depth, openingHeight);
+  // Pocket floors
+  g.fillStyle(0x0a1624, 1);
+  g.fillRect(
+    0,
+    field.centerY - halfOpen,
+    depth,
+    openingHeight,
+  );
+  g.fillRect(
+    field.right,
+    field.centerY - halfOpen,
+    depth,
+    openingHeight,
+  );
 
   return { top, bottom, leftTop, leftBottom, rightTop, rightBottom };
 }
