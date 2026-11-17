@@ -12,6 +12,12 @@ export const MATCH_CONFIG = {
   settleMaxMs: 10_000,
   /** Hold the scored positions so players can see the goal before reset */
   goalCelebrationMs: 5_000,
+  /**
+   * Anti-turtling: if a puck ends a turn inside a goal, eject it this far
+   * into the pitch (fraction of field width from that side's mouth).
+   * Past the natural defensive cluster so camping leaves the goal open.
+   */
+  goalEjectFieldRatio: 0.187,
   players: {
     player1: {
       id: "player1" as const,

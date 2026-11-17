@@ -160,8 +160,8 @@ export class MatchController {
   }
 
   /**
-   * If a puck center is inside a goal pocket at end of turn, place it
-   * just onto the pitch outside that mouth.
+   * If a puck center is inside a goal pocket at end of turn, shove it
+   * well onto the pitch (anti-turtling) instead of parking it at the mouth.
    */
   private ejectPucksFromGoals(): void {
     const field = getFieldBounds();
@@ -170,6 +170,7 @@ export class MatchController {
     const matter = this.scene.matter;
     const minY = wallThickness + margin;
     const maxY = PROTOTYPE_CONFIG.arena.height - wallThickness - margin;
+    const inset = field.width * MATCH_CONFIG.goalEjectFieldRatio;
 
     for (const puck of this.pucks) {
       const side = pointInGoalSide(
@@ -181,8 +182,8 @@ export class MatchController {
 
       const x =
         side === "player1"
-          ? field.left + wallThickness + margin
-          : field.right - wallThickness - margin;
+          ? field.left + inset
+          : field.right - inset;
       const y = Math.min(maxY, Math.max(minY, puck.body.position.y));
 
       puck.body.isSleeping = false;
