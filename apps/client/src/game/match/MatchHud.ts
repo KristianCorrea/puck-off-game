@@ -1,5 +1,9 @@
 import type Phaser from "phaser";
-import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
+import {
+  PROTOTYPE_CONFIG,
+  getFieldBounds,
+  u,
+} from "../config/prototypeConfig";
 import type { MatchPhase, MatchResult, PlayerId } from "../config/gameConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
 import { GoalCelebration } from "../ui/GoalCelebration";
@@ -40,18 +44,18 @@ export class MatchHud {
     this.panel.fillStyle(0x0b1a28, 0.98);
     this.panel.fillRect(0, 0, width, hudHeight);
     this.panel.fillStyle(0x134e4a, 1);
-    this.panel.fillRect(0, hudHeight - 4, width * 0.5, 4);
+    this.panel.fillRect(0, hudHeight - u(4), width * 0.5, u(4));
     this.panel.fillStyle(0x9f1239, 1);
-    this.panel.fillRect(width * 0.5, hudHeight - 4, width * 0.5, 4);
-    this.panel.lineStyle(1, 0x2dd4bf, 0.25);
+    this.panel.fillRect(width * 0.5, hudHeight - u(4), width * 0.5, u(4));
+    this.panel.lineStyle(u(1), 0x2dd4bf, 0.25);
     this.panel.lineBetween(0, hudHeight - 1, width, hudHeight - 1);
 
     this.brandText = scene.add
-      .text(28, 18, "PUCK OFF", {
+      .text(u(28), u(18), "PUCK OFF", {
         fontFamily: DISPLAY,
-        fontSize: "34px",
+        fontSize: `${u(34)}px`,
         color: "#e2e8f0",
-        letterSpacing: 2,
+        letterSpacing: u(2),
       })
       .setOrigin(0, 0)
       .setDepth(41)
@@ -59,12 +63,12 @@ export class MatchHud {
 
     this.metaText = scene.add
       .text(
-        28,
-        54,
+        u(28),
+        u(54),
         `FIRST TO ${MATCH_CONFIG.maxGoals}  ·  ${MATCH_CONFIG.turnDurationMs / 1000}S TURNS`,
         {
           fontFamily: FONT,
-          fontSize: "11px",
+          fontSize: `${u(11)}px`,
           color: "#64748b",
           fontStyle: "700",
         },
@@ -74,9 +78,9 @@ export class MatchHud {
       .setScrollFactor(0);
 
     this.scoreText = scene.add
-      .text(field.centerX, 10, "0  —  0", {
+      .text(field.centerX, u(10), "0  —  0", {
         fontFamily: DISPLAY,
-        fontSize: "56px",
+        fontSize: `${u(56)}px`,
         color: "#f8fafc",
       })
       .setOrigin(0.5, 0)
@@ -85,9 +89,9 @@ export class MatchHud {
 
     this.timerPill = scene.add.graphics().setDepth(41).setScrollFactor(0);
     this.timerText = scene.add
-      .text(field.centerX, 68, "20s", {
+      .text(field.centerX, u(68), "20s", {
         fontFamily: FONT,
-        fontSize: "15px",
+        fontSize: `${u(15)}px`,
         color: "#e2e8f0",
         fontStyle: "800",
       })
@@ -96,9 +100,9 @@ export class MatchHud {
       .setScrollFactor(0);
 
     this.turnText = scene.add
-      .text(width - 28, 22, "Player 1 — your turn", {
+      .text(width - u(28), u(22), "Player 1 — your turn", {
         fontFamily: FONT,
-        fontSize: "16px",
+        fontSize: `${u(16)}px`,
         color: "#2dd4bf",
         fontStyle: "700",
       })
@@ -106,17 +110,17 @@ export class MatchHud {
       .setDepth(41)
       .setScrollFactor(0);
 
-    const p1 = this.makePlayerChip("player1", field.centerX - 168, 58);
-    const p2 = this.makePlayerChip("player2", field.centerX + 168, 58);
+    const p1 = this.makePlayerChip("player1", field.centerX - u(168), u(58));
+    const p2 = this.makePlayerChip("player2", field.centerX + u(168), u(58));
     this.p1Chip = p1.container;
     this.p2Chip = p2.container;
     this.p1Name = p1.label;
     this.p2Name = p2.label;
 
     this.bannerText = scene.add
-      .text(field.centerX, field.centerY - 24, "", {
+      .text(field.centerX, field.centerY - u(24), "", {
         fontFamily: DISPLAY,
-        fontSize: "64px",
+        fontSize: `${u(64)}px`,
         color: "#ffe066",
         align: "center",
       })
@@ -125,13 +129,13 @@ export class MatchHud {
       .setVisible(false);
 
     this.rematchText = scene.add
-      .text(field.centerX, field.centerY + 56, "PLAY AGAIN  ·  R", {
+      .text(field.centerX, field.centerY + u(56), "PLAY AGAIN  ·  R", {
         fontFamily: FONT,
-        fontSize: "18px",
+        fontSize: `${u(18)}px`,
         color: "#0f172a",
         backgroundColor: "#fbbf24",
         fontStyle: "800",
-        padding: { x: 22, y: 12 },
+        padding: { x: u(22), y: u(12) },
       })
       .setOrigin(0.5)
       .setDepth(51)
@@ -239,13 +243,13 @@ export class MatchHud {
   ): { container: Phaser.GameObjects.Container; label: Phaser.GameObjects.Text } {
     const p = MATCH_CONFIG.players[id];
     const bg = this.scene.add
-      .rectangle(0, 0, 108, 32, 0x122033, 0.95)
-      .setStrokeStyle(2, p.color, 0.85);
-    const dot = this.scene.add.circle(-36, 0, 7, p.color);
+      .rectangle(0, 0, u(108), u(32), 0x122033, 0.95)
+      .setStrokeStyle(u(2), p.color, 0.85);
+    const dot = this.scene.add.circle(-u(36), 0, u(7), p.color);
     const label = this.scene.add
-      .text(-18, 0, p.short, {
+      .text(-u(18), 0, p.short, {
         fontFamily: FONT,
-        fontSize: "15px",
+        fontSize: `${u(15)}px`,
         color: "#f8fafc",
         fontStyle: "800",
       })
@@ -270,15 +274,15 @@ export class MatchHud {
 
   private drawTimerPill(urgent: boolean): void {
     const field = getFieldBounds();
-    const w = 72;
-    const h = 28;
+    const w = u(72);
+    const h = u(28);
     const x = field.centerX - w / 2;
-    const y = 68 - h / 2;
+    const y = u(68) - h / 2;
     this.timerPill.clear();
     this.timerPill.fillStyle(urgent ? 0x7f1d1d : 0x1e293b, 0.95);
-    this.timerPill.fillRoundedRect(x, y, w, h, 14);
-    this.timerPill.lineStyle(2, urgent ? 0xf87171 : 0x334155, 1);
-    this.timerPill.strokeRoundedRect(x, y, w, h, 14);
+    this.timerPill.fillRoundedRect(x, y, w, h, u(14));
+    this.timerPill.lineStyle(u(2), urgent ? 0xf87171 : 0x334155, 1);
+    this.timerPill.strokeRoundedRect(x, y, w, h, u(14));
   }
 
   private onRematchKey = (): void => {
@@ -332,9 +336,9 @@ export function highlightActivePucks(
     }
 
     if (selected && active) {
-      puck.sprite.setStrokeStyle(5, 0xfbbf24);
+      puck.sprite.setStrokeStyle(u(5), 0xfbbf24);
     } else {
-      puck.sprite.setStrokeStyle(4, stroke, mine && active ? 0.95 : 0.45);
+      puck.sprite.setStrokeStyle(u(4), stroke, mine && active ? 0.95 : 0.45);
     }
   }
 }

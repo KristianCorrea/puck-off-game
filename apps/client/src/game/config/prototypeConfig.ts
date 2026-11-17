@@ -1,18 +1,29 @@
 /**
  * Centralized prototype tuning. Phase 2+ will evolve this into GAME_CONFIG.
+ *
+ * DESIGN_SCALE raises the fixed render resolution so Scale.FIT downscales on
+ * large/HiDPI screens instead of upscaling a soft 1240-wide buffer.
+ * All world/UI pixel values should go through `u()` or these scaled config fields.
  */
+export const DESIGN_SCALE = 2;
+
+/** Scale a design-pixel value into the high-res world. */
+export function u(n: number): number {
+  return n * DESIGN_SCALE;
+}
+
 export const PROTOTYPE_CONFIG = {
   arena: {
     /** Full canvas including HUD band + recessed goal pockets */
-    width: 1240,
+    width: u(1240),
     /** Dedicated top chrome for score / turn / clock */
-    hudHeight: 104,
+    hudHeight: u(104),
     /** Playable pitch height (below HUD) */
-    playHeight: 640,
+    playHeight: u(640),
     /** Total canvas height = hudHeight + playHeight */
-    height: 744,
-    wallThickness: 26,
-    cornerRadius: 18,
+    height: u(744),
+    wallThickness: u(26),
+    cornerRadius: u(18),
     backgroundColor: 0x071018,
     floorColor: 0x0f2740,
     floorAccent: 0x143352,
@@ -22,18 +33,18 @@ export const PROTOTYPE_CONFIG = {
   },
 
   goal: {
-    openingHeight: 200,
+    openingHeight: u(200),
     /** Recessed pocket depth (Soccer Stars–style cage behind the mouth) */
-    depth: 78,
-    postThickness: 18,
-    sensorPadding: 10,
+    depth: u(78),
+    postThickness: u(18),
+    sensorPadding: u(10),
     color: 0xffb703,
     netColor: 0xe09f3e,
     sensorAlpha: 0.14,
   },
 
   puck: {
-    radius: 28,
+    radius: u(28),
     color: 0x2ec4b6,
     strokeColor: 0x1a9e93,
     mass: 10,
@@ -46,7 +57,7 @@ export const PROTOTYPE_CONFIG = {
   },
 
   ball: {
-    radius: 16,
+    radius: u(16),
     color: 0xfff7ed,
     strokeColor: 0xfbbf24,
     mass: 1.2,
@@ -57,17 +68,17 @@ export const PROTOTYPE_CONFIG = {
 
   shot: {
     /** Drag distance (px) that maps to power 1.0 */
-    maxDragPx: 160,
-    /** Launch speed at power 1.0 (Matter velocity units) */
-    maxSpeed: 16,
+    maxDragPx: u(160),
+    /** Launch speed at power 1.0 (Matter velocity units) — scaled with world */
+    maxSpeed: u(16),
     minPower: 0.08,
   },
 
   settle: {
     /** Speed below this counts as nearly stopped */
-    sleepSpeed: 0.08,
+    sleepSpeed: u(0.08),
     /** Clamp micro-velocities each frame when below this */
-    stopSpeed: 0.045,
+    stopSpeed: u(0.045),
   },
 } as const;
 

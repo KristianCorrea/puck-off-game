@@ -5,7 +5,7 @@ import {
   type MatchResult,
   type PlayerId,
 } from "../config/gameConfig";
-import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, getFieldBounds, u } from "../config/prototypeConfig";
 import type { BallEntity } from "../entities/createBall";
 import {
   ballInGoalSide,
@@ -211,7 +211,7 @@ export class MatchController {
   private ejectPucksFromGoals(): void {
     const field = getFieldBounds();
     const { wallThickness } = PROTOTYPE_CONFIG.arena;
-    const margin = PROTOTYPE_CONFIG.puck.radius + 10;
+    const margin = PROTOTYPE_CONFIG.puck.radius + u(10);
     const matter = this.scene.matter;
     const minY = field.top + wallThickness + margin;
     const maxY = field.bottom - wallThickness - margin;

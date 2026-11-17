@@ -1,10 +1,10 @@
 import type Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
 import { applyImpulse, type PuckEntity } from "../entities/createPuck";
 import { AimIndicator } from "../ui/AimIndicator";
 
 /** Pointer travel below this on release counts as a tap (select), not a flick. */
-const TAP_MAX_MOVE_PX = 10;
+const TAP_MAX_MOVE_PX = u(10);
 
 type DragState = {
   active: boolean;

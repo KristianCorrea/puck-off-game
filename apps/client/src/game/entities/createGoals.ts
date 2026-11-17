@@ -2,6 +2,7 @@ import type Phaser from "phaser";
 import {
   PROTOTYPE_CONFIG,
   getFieldBounds,
+  u,
   type GoalSide,
 } from "../config/prototypeConfig";
 
@@ -220,7 +221,7 @@ function drawGoalVisuals(
   g.fillRect(rightRailX, mouthBottom, rightRailW, postThickness);
 
   // Pitch-face mouth trim (yellow starts at the goal area entrance)
-  g.lineStyle(3, color, 1);
+  g.lineStyle(u(3), color, 1);
   g.strokeRect(fieldLeft, mouthTop, wallThickness, openingHeight);
   g.strokeRect(
     fieldRight - wallThickness,
@@ -235,8 +236,8 @@ function drawGoalVisuals(
     g.fillRect(z.minX, z.minY, z.maxX - z.minX, z.maxY - z.minY);
   }
 
-  g.lineStyle(1, 0xfff3c4, 0.4);
-  const netStep = 14;
+  g.lineStyle(u(1), 0xfff3c4, 0.4);
+  const netStep = u(14);
   for (let x = postThickness + netStep; x < depth - 2; x += netStep) {
     g.lineBetween(x, mouthTop, x, mouthBottom);
   }

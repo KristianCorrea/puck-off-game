@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { getFieldBounds } from "../config/prototypeConfig";
+import { getFieldBounds, u } from "../config/prototypeConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
 
 const PARTICLE_KEY = "goal_party_particle";
@@ -39,12 +39,12 @@ export class GoalCelebration {
       .setScrollFactor(0);
 
     this.glowText = scene.add
-      .text(field.centerX, field.centerY - 24, "GOAL!!!", {
+      .text(field.centerX, field.centerY - u(24), "GOAL!!!", {
         fontFamily: "Impact, Haettenschweiler, Arial Black, sans-serif",
-        fontSize: "96px",
+        fontSize: `${u(96)}px`,
         color: "#ff9f1c",
         stroke: "#ff6b00",
-        strokeThickness: 14,
+        strokeThickness: u(14),
         align: "center",
       })
       .setOrigin(0.5)
@@ -54,18 +54,18 @@ export class GoalCelebration {
       .setVisible(false);
 
     this.goalText = scene.add
-      .text(field.centerX, field.centerY - 24, "GOAL!!!", {
+      .text(field.centerX, field.centerY - u(24), "GOAL!!!", {
         fontFamily: "Impact, Haettenschweiler, Arial Black, sans-serif",
-        fontSize: "88px",
+        fontSize: `${u(88)}px`,
         color: "#ffe066",
         stroke: "#7a3e00",
-        strokeThickness: 12,
+        strokeThickness: u(12),
         align: "center",
         shadow: {
           offsetX: 0,
-          offsetY: 6,
+          offsetY: u(6),
           color: "#000000",
-          blur: 16,
+          blur: u(16),
           fill: true,
           stroke: true,
         },
@@ -133,7 +133,7 @@ export class GoalCelebration {
     const texts = [this.glowText, this.goalText];
 
     for (const t of texts) {
-      t.setPosition(field.centerX, field.centerY - 24);
+      t.setPosition(field.centerX, field.centerY - u(24));
       t.setVisible(true);
       t.setAlpha(0);
       t.setScale(0.15);
@@ -227,9 +227,9 @@ export class GoalCelebration {
     const shards = "GOAL!!!".split("");
     for (let i = 0; i < shards.length; i++) {
       const shard = this.scene.add
-        .text(x + (i - 3) * 18, y, shards[i]!, {
+        .text(x + (i - 3) * u(18), y, shards[i]!, {
           fontFamily: "Impact, Haettenschweiler, Arial Black, sans-serif",
-          fontSize: "42px",
+          fontSize: `${u(42)}px`,
           color: phaserColorToCss(
             CONFETTI_COLORS[i % CONFETTI_COLORS.length]!,
           ),
@@ -239,7 +239,7 @@ export class GoalCelebration {
         .setScrollFactor(0);
 
       const angle = Phaser.Math.DegToRad(-160 + i * 40 + Phaser.Math.Between(-10, 10));
-      const dist = Phaser.Math.Between(160, 280);
+      const dist = Phaser.Math.Between(u(160), u(280));
       this.scene.tweens.add({
         targets: shard,
         x: x + Math.cos(angle) * dist,
@@ -256,9 +256,9 @@ export class GoalCelebration {
 
   private spawnConfettiStorm(): void {
     const field = getFieldBounds();
-    this.burstConfetti(field.centerX, field.centerY - 40, 90);
-    this.burstConfetti(field.centerX - 180, field.centerY - 80, 50);
-    this.burstConfetti(field.centerX + 180, field.centerY - 80, 50);
+    this.burstConfetti(field.centerX, field.centerY - u(40), 90);
+    this.burstConfetti(field.centerX - u(180), field.centerY - u(80), 50);
+    this.burstConfetti(field.centerX + u(180), field.centerY - u(80), 50);
 
     // Keep the party going with top-rain bursts.
     this.burstTimer = this.scene.time.addEvent({
@@ -268,20 +268,20 @@ export class GoalCelebration {
         if (!this.playing) return;
         const x =
           field.left +
-          40 +
-          Math.random() * (field.width - 80);
-        this.burstConfetti(x, 40, 28);
+          u(40) +
+          Math.random() * (field.width - u(80));
+        this.burstConfetti(x, u(40), 28);
       },
     });
   }
 
   private burstConfetti(x: number, y: number, count: number): void {
     const emitter = this.scene.add.particles(x, y, PARTICLE_KEY, {
-      speed: { min: 180, max: 520 },
+      speed: { min: u(180), max: u(520) },
       angle: { min: 0, max: 360 },
       lifespan: { min: 900, max: 1800 },
       scale: { start: 1.1, end: 0.15 },
-      gravityY: 520,
+      gravityY: u(520),
       quantity: count,
       frequency: -1,
       blendMode: "ADD",
@@ -306,10 +306,10 @@ function ensureParticleTexture(scene: Phaser.Scene): void {
   if (scene.textures.exists(PARTICLE_KEY)) return;
   const g = scene.make.graphics({ x: 0, y: 0 });
   g.fillStyle(0xffffff, 1);
-  g.fillCircle(6, 6, 6);
+  g.fillCircle(u(6), u(6), u(6));
   g.fillStyle(0xffffff, 1);
-  g.fillRect(2, 2, 8, 4);
-  g.generateTexture(PARTICLE_KEY, 12, 12);
+  g.fillRect(u(2), u(2), u(8), u(4));
+  g.generateTexture(PARTICLE_KEY, u(12), u(12));
   g.destroy();
 }
 

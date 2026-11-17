@@ -1,5 +1,5 @@
 import type Phaser from "phaser";
-import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, getFieldBounds, u } from "../config/prototypeConfig";
 
 export type WallBodies = {
   top: MatterJS.BodyType;
@@ -127,7 +127,7 @@ export function createWalls(scene: Phaser.Scene): WallBodies {
 
   // Inner bevel
   g.fillStyle(wallInner, 0.85);
-  const inset = 5;
+  const inset = u(5);
   g.fillRect(
     field.left + inset,
     field.top + inset,

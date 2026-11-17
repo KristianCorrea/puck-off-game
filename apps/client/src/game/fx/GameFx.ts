@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
 import type { BallEntity } from "../entities/createBall";
 import type { PuckEntity } from "../entities/createPuck";
 import { ensureFxParticleTexture, FX_PARTICLE_KEY } from "./fxTextures";
@@ -117,11 +117,13 @@ export class GameFx {
         onUpdate: (tween) => {
           const t = tween.progress;
           ring.clear();
-          ring.lineStyle(3 - i, color, (0.85 - i * 0.25) * (1 - t));
+          ring.lineStyle(u(3) - i, color, (0.85 - i * 0.25) * (1 - t));
           ring.strokeCircle(
             x,
             y,
-            PROTOTYPE_CONFIG.puck.radius + 4 + t * (28 + p * 50 + i * 18),
+            PROTOTYPE_CONFIG.puck.radius +
+              u(4) +
+              t * (u(28) + p * u(50) + i * u(18)),
           );
         },
         onComplete: () => {
@@ -134,7 +136,7 @@ export class GameFx {
     const deg = Phaser.Math.RadToDeg(angle);
     const jetCount = Math.floor(10 + p * 22);
     const jet = this.scene.add.particles(x, y, FX_PARTICLE_KEY, {
-      speed: { min: 80 + p * 120, max: 160 + p * 280 },
+      speed: { min: u(80) + p * u(120), max: u(160) + p * u(280) },
       angle: { min: deg - 28, max: deg + 28 },
       lifespan: { min: 220, max: 480 },
       scale: { start: 0.7 + p * 0.5, end: 0 },
@@ -154,7 +156,7 @@ export class GameFx {
 
     const dustCount = Math.floor(8 + p * 14);
     const flash = this.scene.add.particles(x, y, FX_PARTICLE_KEY, {
-      speed: { min: 40, max: 140 + p * 160 },
+      speed: { min: u(40), max: u(140) + p * u(160) },
       angle: { min: 0, max: 360 },
       lifespan: { min: 180, max: 360 },
       scale: { start: 0.55, end: 0 },
@@ -228,7 +230,7 @@ export class GameFx {
       seed,
       lifeMs: 55 + power * 45,
       maxLifeMs: 55 + power * 45,
-      reach: rim + 8 + power * 10 + Math.random() * (4 + power * 6),
+      reach: rim + u(8) + power * u(10) + Math.random() * (u(4) + power * u(6)),
     });
   }
 
@@ -255,7 +257,7 @@ export class GameFx {
         jolt.seed,
         0x67e8f9,
         alpha * 0.4,
-        2.2,
+        u(2.2),
       );
       this.strokeJolt(
         g,
@@ -267,7 +269,7 @@ export class GameFx {
         jolt.seed + 3,
         0xffffff,
         alpha,
-        1.15,
+        u(1.15),
       );
 
       // Optional tiny fork near the tip at higher power.
@@ -282,11 +284,11 @@ export class GameFx {
           cy + Math.sin(jolt.angle) * midR,
           forkAng,
           0,
-          6 + this.chargePower * 8,
+          u(6) + this.chargePower * u(8),
           jolt.seed + 15,
           0xffffff,
           alpha * 0.7,
-          1,
+          u(1),
         );
       }
     }
@@ -313,7 +315,7 @@ export class GameFx {
     for (let s = 1; s <= segments; s++) {
       const t = s / segments;
       const r = startR + (endR - startR) * t;
-      const jag = (hash01(seed + s * 11) - 0.5) * 5 * (1 - t * 0.4);
+      const jag = (hash01(seed + s * 11) - 0.5) * u(5) * (1 - t * 0.4);
       const a = angle + jag * 0.05;
       g.lineTo(
         cx + Math.cos(a) * r + Math.cos(a + Math.PI / 2) * jag,
@@ -324,7 +326,7 @@ export class GameFx {
   }
 
   private updateTrails(): void {
-    const minSpeed = 1.2;
+    const minSpeed = u(1.2);
     for (const t of this.trailTargets) {
       const emitter = this.trails.get(t.id);
       if (!emitter) continue;
@@ -332,7 +334,7 @@ export class GameFx {
       const pos = t.getPos();
       emitter.setPosition(pos.x, pos.y);
       if (speed >= minSpeed) {
-        const intensity = Math.min(1, (speed - minSpeed) / 10);
+        const intensity = Math.min(1, (speed - minSpeed) / u(10));
         emitter.setFrequency(32 - intensity * 18);
         emitter.start();
       } else {
@@ -345,7 +347,7 @@ export class GameFx {
     color: number,
   ): Phaser.GameObjects.Particles.ParticleEmitter {
     const emitter = this.scene.add.particles(0, 0, FX_PARTICLE_KEY, {
-      speed: { min: 4, max: 28 },
+      speed: { min: u(4), max: u(28) },
       lifespan: { min: 180, max: 420 },
       scale: { start: 0.55, end: 0 },
       frequency: 28,
@@ -371,7 +373,7 @@ export class GameFx {
         (a.velocity?.x ?? 0) - (b.velocity?.x ?? 0),
         (a.velocity?.y ?? 0) - (b.velocity?.y ?? 0),
       );
-      if (rel < 1.5) continue;
+      if (rel < u(1.5)) continue;
 
       const support = pair.collision?.supports?.[0];
       const x =
@@ -379,14 +381,17 @@ export class GameFx {
       const y =
         support?.y ?? ((a.position?.y ?? 0) + (b.position?.y ?? 0)) / 2;
 
-      this.spark(x, y, Math.min(1, rel / 12));
+      this.spark(x, y, Math.min(1, rel / u(12)));
     }
   };
 
   private spark(x: number, y: number, intensity: number): void {
     const count = Math.floor(4 + intensity * 14);
     const emitter = this.scene.add.particles(x, y, FX_PARTICLE_KEY, {
-      speed: { min: 60 + intensity * 80, max: 140 + intensity * 220 },
+      speed: {
+        min: u(60) + intensity * u(80),
+        max: u(140) + intensity * u(220),
+      },
       angle: { min: 0, max: 360 },
       lifespan: { min: 120, max: 320 },
       scale: { start: 0.45 + intensity * 0.35, end: 0 },
@@ -407,7 +412,7 @@ export class GameFx {
     const flash = this.scene.add.circle(
       x,
       y,
-      4 + intensity * 10,
+      u(4) + intensity * u(10),
       0xffffff,
       0.55,
     );

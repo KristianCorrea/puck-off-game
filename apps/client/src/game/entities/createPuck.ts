@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
 import type { PlayerId } from "../config/gameConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
 
@@ -20,14 +20,14 @@ export function createPuckAt(
   const colors = MATCH_CONFIG.players[opts.ownerId];
 
   const sprite = scene.add.circle(opts.x, opts.y, cfg.radius, colors.color);
-  sprite.setStrokeStyle(4, colors.strokeColor, 0.95);
+  sprite.setStrokeStyle(u(4), colors.strokeColor, 0.95);
   // Above pitch markings (depth 1) and walls/goals (2–3).
   sprite.setDepth(12);
   sprite.setData("puckId", opts.id);
 
   // Soft highlight — cosmetic only; position synced each frame.
-  const ring = scene.add.circle(opts.x, opts.y, cfg.radius - 7, 0xffffff, 0.12);
-  ring.setStrokeStyle(2, 0xffffff, 0.2);
+  const ring = scene.add.circle(opts.x, opts.y, cfg.radius - u(7), 0xffffff, 0.12);
+  ring.setStrokeStyle(u(2), 0xffffff, 0.2);
   ring.setDepth(12.1);
   sprite.setData("shine", ring);
 

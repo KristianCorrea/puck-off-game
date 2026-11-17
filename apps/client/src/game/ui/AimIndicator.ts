@@ -1,5 +1,5 @@
 import type Phaser from "phaser";
-import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
 
 /**
  * Slingshot aim: drag away from puck; arrow shows launch direction (opposite drag).
@@ -25,7 +25,7 @@ export class AimIndicator {
     g.clear();
 
     const length =
-      40 + power * (PROTOTYPE_CONFIG.shot.maxDragPx * 0.85);
+      u(40) + power * (PROTOTYPE_CONFIG.shot.maxDragPx * 0.85);
     const endX = originX + Math.cos(angle) * length;
     const endY = originY + Math.sin(angle) * length;
 
@@ -33,19 +33,19 @@ export class AimIndicator {
     const tipColor = power > 0.7 ? 0xff6b6b : color;
 
     // Soft power glow behind the arrow
-    g.lineStyle(10, tipColor, 0.12 + power * 0.18);
+    g.lineStyle(u(10), tipColor, 0.12 + power * 0.18);
     g.beginPath();
     g.moveTo(originX, originY);
     g.lineTo(endX, endY);
     g.strokePath();
 
-    g.lineStyle(4, tipColor, strength);
+    g.lineStyle(u(4), tipColor, strength);
     g.beginPath();
     g.moveTo(originX, originY);
     g.lineTo(endX, endY);
     g.strokePath();
 
-    const head = 14 + power * 8;
+    const head = u(14) + power * u(8);
     const left = angle + Math.PI * 0.82;
     const right = angle - Math.PI * 0.82;
     g.fillStyle(tipColor, strength);
@@ -62,10 +62,10 @@ export class AimIndicator {
     for (let i = 1; i <= ticks; i++) {
       const t = i / ticks;
       if (t > power) break;
-      const px = originX + Math.cos(angle) * (18 + t * 28);
-      const py = originY + Math.sin(angle) * (18 + t * 28);
+      const px = originX + Math.cos(angle) * (u(18) + t * u(28));
+      const py = originY + Math.sin(angle) * (u(18) + t * u(28));
       g.fillStyle(0xff9f1c, 0.9);
-      g.fillCircle(px, py, 3);
+      g.fillCircle(px, py, u(3));
     }
   }
 
