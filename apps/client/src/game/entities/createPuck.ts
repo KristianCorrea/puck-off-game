@@ -1,24 +1,30 @@
 import Phaser from "phaser";
-import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
+import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
+import type { PlayerId } from "../config/gameConfig";
+import { MATCH_CONFIG } from "../config/gameConfig";
 
 export type PuckEntity = {
+  id: string;
+  ownerId: PlayerId;
   sprite: Phaser.GameObjects.Arc;
   body: MatterJS.BodyType;
 };
 
-export function createPuck(scene: Phaser.Scene): PuckEntity {
-  const field = getFieldBounds();
+export function createPuckAt(
+  scene: Phaser.Scene,
+  opts: { id: string; ownerId: PlayerId; x: number; y: number },
+): PuckEntity {
   const cfg = PROTOTYPE_CONFIG.puck;
-  const x = field.left + field.width * cfg.startXRatio;
-  const y = field.top + field.height * cfg.startYRatio;
+  const colors = MATCH_CONFIG.players[opts.ownerId];
 
-  const sprite = scene.add.circle(x, y, cfg.radius, cfg.color);
-  sprite.setStrokeStyle(3, cfg.strokeColor);
+  const sprite = scene.add.circle(opts.x, opts.y, cfg.radius, colors.color);
+  sprite.setStrokeStyle(3, colors.strokeColor);
   sprite.setDepth(10);
+  sprite.setData("puckId", opts.id);
 
   scene.matter.add.gameObject(sprite, {
     shape: { type: "circle", radius: cfg.radius },
-    label: "puck",
+    label: opts.id,
     friction: cfg.friction,
     frictionAir: cfg.frictionAir,
     restitution: cfg.restitution,
@@ -27,14 +33,22 @@ export function createPuck(scene: Phaser.Scene): PuckEntity {
 
   const body = sprite.body as MatterJS.BodyType;
   scene.matter.body.setMass(body, cfg.mass);
-
   sprite.setInteractive({ useHandCursor: true });
 
-  return { sprite, body };
+  return {
+    id: opts.id,
+    ownerId: opts.ownerId,
+    sprite,
+    body,
+  };
 }
 
 /** Apply a normalized shot. angle is radians; power is 0..1. */
-export function applyImpulse(puck: PuckEntity, angle: number, power: number): void {
+export function applyImpulse(
+  puck: PuckEntity,
+  angle: number,
+  power: number,
+): void {
   const clamped = Math.min(
     1,
     Math.max(PROTOTYPE_CONFIG.shot.minPower, power),

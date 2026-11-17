@@ -23,7 +23,7 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
-**Phase 1:** drag the teal puck and release to flick it into the ball. Tune feel in `apps/client/src/game/config/prototypeConfig.ts`.
+**Phase 2:** hot-seat local match — 5 teal (P1) vs 5 coral (P2) pucks. Alternate turns, first to 3 or timer. Tune physics in `prototypeConfig.ts`, match rules in `gameConfig.ts`.
 
 ## Workspace
 
@@ -40,4 +40,4 @@ docs/         Plan + phase guides
 | [docs/PLAN.md](./docs/PLAN.md) | Rules, architecture, MVP scope |
 | [docs/phases/](./docs/phases/README.md) | Phase-by-phase guides |
 
-Currently at **Phase 1** — physics prototype. Next: [Phase 2 local match](./docs/phases/PHASE_02_LOCAL_MATCH.md).
+Currently at **Phase 2** — local match. Next: [Phase 3 game engine](./docs/phases/PHASE_03_GAME_ENGINE.md).

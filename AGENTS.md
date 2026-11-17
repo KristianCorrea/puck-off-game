@@ -57,4 +57,4 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 
 > Can I flick a puck at a ball and does the collision feel satisfying?
 
-**Phase 1 is in progress in the client.** Run `npm run dev`, drag the teal puck, release to flick. Tune `apps/client/src/game/config/prototypeConfig.ts`.
+**Phase 2 local match is in the client.** Run `npm run dev` for hot-seat play (5v5 pucks, turns, score, timer). Tune physics in `prototypeConfig.ts`, match rules in `gameConfig.ts`.

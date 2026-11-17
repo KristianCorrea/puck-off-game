@@ -6,57 +6,94 @@ import { AimIndicator } from "../ui/AimIndicator";
 type DragState = {
   active: boolean;
   pointerId: number;
+  puck: PuckEntity | null;
 };
 
+export type FlickControllerOptions = {
+  getSelectablePucks: () => PuckEntity[];
+  onLaunch?: (puck: PuckEntity) => void;
+};
+
+type PuckHandler = (
+  pointer: Phaser.Input.Pointer,
+  localX: number,
+  localY: number,
+  event: Phaser.Types.Input.EventData,
+) => void;
+
 /**
- * Pointer drag on puck → aim + power → impulse on release.
- * Drag away from puck; launch direction is opposite the drag vector (slingshot).
+ * Multi-puck slingshot: only selectable pucks respond to pointerdown.
  */
 export class FlickController {
   private readonly scene: Phaser.Scene;
-  private readonly puck: PuckEntity;
   private readonly aim: AimIndicator;
-  private readonly drag: DragState = { active: false, pointerId: -1 };
+  private readonly opts: FlickControllerOptions;
+  private readonly drag: DragState = {
+    active: false,
+    pointerId: -1,
+    puck: null,
+  };
   private enabled = true;
+  private readonly handlers = new Map<string, PuckHandler>();
+  private boundPucks: PuckEntity[] = [];
 
-  constructor(scene: Phaser.Scene, puck: PuckEntity) {
+  constructor(scene: Phaser.Scene, opts: FlickControllerOptions) {
     this.scene = scene;
-    this.puck = puck;
+    this.opts = opts;
     this.aim = new AimIndicator(scene);
 
-    // Sprite hit-test is more reliable than manual world-distance checks under FIT scale.
-    puck.sprite.on("pointerdown", this.onPuckDown, this);
     scene.input.on("pointermove", this.onPointerMove, this);
     scene.input.on("pointerup", this.onPointerUp, this);
     scene.input.on("pointerupoutside", this.onPointerUp, this);
   }
 
-  setEnabled(value: boolean): void {
-    this.enabled = value;
-    if (!value) {
-      this.drag.active = false;
-      this.aim.hide();
+  bindPucks(pucks: PuckEntity[]): void {
+    this.unbindPucks();
+    this.boundPucks = pucks;
+    for (const puck of pucks) {
+      const handler: PuckHandler = (pointer, _lx, _ly, event) => {
+        this.beginDrag(puck, pointer, event);
+      };
+      this.handlers.set(puck.id, handler);
+      puck.sprite.on("pointerdown", handler);
     }
   }
 
+  setEnabled(value: boolean): void {
+    this.enabled = value;
+    if (!value) this.cancelDrag();
+  }
+
   destroy(): void {
-    this.puck.sprite.off("pointerdown", this.onPuckDown, this);
+    this.unbindPucks();
     this.scene.input.off("pointermove", this.onPointerMove, this);
     this.scene.input.off("pointerup", this.onPointerUp, this);
     this.scene.input.off("pointerupoutside", this.onPointerUp, this);
     this.aim.destroy();
   }
 
-  private onPuckDown(
+  private unbindPucks(): void {
+    for (const puck of this.boundPucks) {
+      const handler = this.handlers.get(puck.id);
+      if (handler) puck.sprite.off("pointerdown", handler);
+    }
+    this.handlers.clear();
+    this.boundPucks = [];
+  }
+
+  private beginDrag(
+    puck: PuckEntity,
     pointer: Phaser.Input.Pointer,
-    _localX: number,
-    _localY: number,
     event: Phaser.Types.Input.EventData,
   ): void {
     if (!this.enabled || this.drag.active) return;
+    const selectable = this.opts.getSelectablePucks();
+    if (!selectable.some((p) => p.id === puck.id)) return;
+
     event.stopPropagation();
     this.drag.active = true;
     this.drag.pointerId = pointer.id;
+    this.drag.puck = puck;
     this.updateAim(pointer);
   }
 
@@ -68,35 +105,43 @@ export class FlickController {
   private onPointerUp(pointer: Phaser.Input.Pointer): void {
     if (!this.drag.active || pointer.id !== this.drag.pointerId) return;
 
-    const shot = this.computeShot(pointer);
+    const puck = this.drag.puck;
+    const shot = puck ? this.computeShot(pointer, puck) : null;
+    this.cancelDrag();
+
+    if (!puck || !shot) return;
+
+    applyImpulse(puck, shot.angle, shot.power);
+    this.opts.onLaunch?.(puck);
+  }
+
+  private cancelDrag(): void {
     this.drag.active = false;
+    this.drag.puck = null;
     this.aim.hide();
-
-    if (!shot) return;
-
-    applyImpulse(this.puck, shot.angle, shot.power);
   }
 
   private updateAim(pointer: Phaser.Input.Pointer): void {
-    const shot = this.computeShot(pointer);
+    const puck = this.drag.puck;
+    if (!puck) return;
+    const shot = this.computeShot(pointer, puck);
     if (!shot) {
       this.aim.hide();
       return;
     }
-    const { x, y } = this.puck.body.position;
+    const { x, y } = puck.body.position;
     this.aim.show(x, y, shot.angle, shot.power);
   }
 
   private pointerWorld(pointer: Phaser.Input.Pointer): { x: number; y: number } {
-    const cam = this.scene.cameras.main;
-    const out = cam.getWorldPoint(pointer.x, pointer.y);
-    return { x: out.x, y: out.y };
+    return this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
   }
 
   private computeShot(
     pointer: Phaser.Input.Pointer,
+    puck: PuckEntity,
   ): { angle: number; power: number } | null {
-    const { x, y } = this.puck.body.position;
+    const { x, y } = puck.body.position;
     const world = this.pointerWorld(pointer);
     const dragX = world.x - x;
     const dragY = world.y - y;
