@@ -82,13 +82,13 @@ export class GoalCelebration {
     this.stop();
     this.playing = true;
 
-    const cam = this.scene.cameras.main;
-    cam.shake(450, 0.018);
+    // Letterbox zoom shrinks perceived shake — scale intensity by 1/zoom.
+    shakeCam(this.scene, 450, 0.045);
     this.scene.time.delayedCall(280, () => {
-      if (this.playing) cam.shake(700, 0.01);
+      if (this.playing) shakeCam(this.scene, 700, 0.028);
     });
     this.scene.time.delayedCall(900, () => {
-      if (this.playing) cam.shake(500, 0.006);
+      if (this.playing) shakeCam(this.scene, 500, 0.016);
     });
 
     this.flash.setAlpha(0.85);
@@ -209,7 +209,7 @@ export class GoalCelebration {
     const { x, y } = this.goalText;
     this.burstConfetti(x, y, 140);
 
-    this.scene.cameras.main.shake(350, 0.014);
+    shakeCam(this.scene, 400, 0.035);
 
     this.scene.tweens.add({
       targets: [this.goalText, this.glowText],
@@ -315,4 +315,15 @@ function ensureParticleTexture(scene: Phaser.Scene): void {
 
 function phaserColorToCss(color: number): string {
   return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+/** Camera zoom letterboxing reduces on-screen shake; compensate so feel matches FIT. */
+function shakeCam(
+  scene: Phaser.Scene,
+  duration: number,
+  intensity: number,
+): void {
+  const cam = scene.cameras.main;
+  const zoom = Math.max(cam.zoom, 0.001);
+  cam.shake(duration, intensity / zoom);
 }
