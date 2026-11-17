@@ -17,4 +17,9 @@ export class ScoreKeeper {
     if (this.player2 >= MATCH_CONFIG.maxGoals) return "player2";
     return null;
   }
+
+  reset(): void {
+    this.player1 = 0;
+    this.player2 = 0;
+  }
 }

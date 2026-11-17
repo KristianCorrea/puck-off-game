@@ -109,6 +109,29 @@ export class MatchController {
     this.fx.destroy();
   }
 
+  /**
+   * Soft rematch — reset rules/state in place.
+   * Avoids Phaser Matter + Scale.RESIZE scene.restart freezes.
+   */
+  rematch(): void {
+    this.hud.stopGoalCelebration();
+    this.fx.hideCharge();
+    this.flick.setEnabled(false);
+
+    this.result = null;
+    this.stableFrames = 0;
+    this.settleElapsedMs = 0;
+    this.goalPauseMs = 0;
+    this.turnAnnounce = false;
+
+    this.score.reset();
+    this.turns.reset("player1");
+    this.resetBallMidfield();
+    this.resetAllPucksToSpawn();
+    this.enterPlayerTurn();
+    this.refreshUi();
+  }
+
   update(deltaMs: number): void {
     this.dampenAll();
     this.fx.update(deltaMs);

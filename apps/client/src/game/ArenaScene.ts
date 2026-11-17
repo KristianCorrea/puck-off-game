@@ -9,7 +9,6 @@ import { drawPitchMarkings } from "./entities/drawPitch";
 import { getDefenseLayout } from "./match/layouts/defenseLayout";
 import { MatchController } from "./match/MatchController";
 import { bindLetterboxCamera } from "./scale/letterboxCamera";
-import { enterPlayMode } from "../mobile/playShell";
 
 /**
  * Phase 2: full local hot-seat match on one machine.
@@ -17,7 +16,7 @@ import { enterPlayMode } from "../mobile/playShell";
 export class ArenaScene extends Phaser.Scene {
   private match: MatchController | null = null;
   private audio: GameAudio | null = null;
-  private restartQueued = false;
+  private rematchQueued = false;
 
   constructor() {
     super("ArenaScene");
@@ -28,7 +27,7 @@ export class ArenaScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.restartQueued = false;
+    this.rematchQueued = false;
     const { width, height, hudHeight } = PROTOTYPE_CONFIG.arena;
 
     bindLetterboxCamera(this);
@@ -97,15 +96,14 @@ export class ArenaScene extends Phaser.Scene {
     this.audio?.unlock();
   };
 
-  /** Defer restart so we don't tear down the scene inside a pointer/key callback. */
+  /** Soft rematch next tick — never tear down the Matter scene. */
   private queueRematch(): void {
-    if (this.restartQueued) return;
-    this.restartQueued = true;
+    if (this.rematchQueued || !this.match) return;
+    this.rematchQueued = true;
     this.audio?.unlock();
-    // User gesture: re-assert fullscreen / landscape before recreating the scene.
-    void enterPlayMode();
     this.time.delayedCall(0, () => {
-      this.scene.restart();
+      this.match?.rematch();
+      this.rematchQueued = false;
     });
   }
 }
