@@ -12,12 +12,6 @@ type TrailTarget = {
   color: number;
 };
 
-type MatterPair = {
-  bodyA: MatterJS.BodyType;
-  bodyB: MatterJS.BodyType;
-  collision?: { supports?: { x: number; y: number }[] };
-};
-
 /**
  * Cosmetic-only juice: charge aura, launch burst, motion trails, collision sparks.
  * Never writes Matter velocities/positions.
@@ -39,6 +33,7 @@ export class GameFx {
   private chargeJoltCooldownMs = 0;
   private readonly chargeJolts: ChargeJolt[] = [];
   private readonly ephemeral: Phaser.GameObjects.GameObject[] = [];
+  private readonly prevSpeeds = new Map<string, number>();
 
   constructor(
     scene: Phaser.Scene,
@@ -76,7 +71,25 @@ export class GameFx {
       this.trails.set(t.id, this.createTrailEmitter(t.color));
     }
 
-    scene.matter.world.on("collisionstart", this.onCollision, this);
+    // Collision sparks come from observeSpeeds() — client Matter does not simulate.
+  }
+
+  /**
+   * Approximate impact FX from engine-driven velocity changes (no local Matter steps).
+   */
+  observeSpeeds(
+    samples: { id: string; x: number; y: number; speed: number }[],
+  ): void {
+    for (const s of samples) {
+      const prev = this.prevSpeeds.get(s.id) ?? s.speed;
+      const drop = prev - s.speed;
+      if (drop >= u(1.5) && prev >= u(2)) {
+        const intensity = Math.min(1, drop / u(12));
+        this.audio?.playHit(intensity, false);
+        this.spark(s.x, s.y, intensity);
+      }
+      this.prevSpeeds.set(s.id, s.speed);
+    }
   }
 
   /**
@@ -184,7 +197,7 @@ export class GameFx {
   }
 
   destroy(): void {
-    this.scene.matter.world.off("collisionstart", this.onCollision, this);
+    this.prevSpeeds.clear();
     this.hideCharge();
     this.chargeGfx.destroy();
     for (const emitter of this.trails.values()) emitter.destroy();
@@ -363,38 +376,6 @@ export class GameFx {
     emitter.setDepth(9);
     return emitter;
   }
-
-  private onCollision = (
-    event: Phaser.Physics.Matter.Events.CollisionStartEvent,
-  ): void => {
-    const pairs = (event.pairs ?? []) as MatterPair[];
-    for (const pair of pairs) {
-      if (!pair?.bodyA || !pair?.bodyB) continue;
-      const a = pair.bodyA;
-      const b = pair.bodyB;
-      const rel = Math.hypot(
-        (a.velocity?.x ?? 0) - (b.velocity?.x ?? 0),
-        (a.velocity?.y ?? 0) - (b.velocity?.y ?? 0),
-      );
-      if (rel < u(1.5)) continue;
-
-      const intensity = Math.min(1, rel / u(12));
-      const againstWall =
-        a.label === "wall" ||
-        b.label === "wall" ||
-        a.label === "goal_cage" ||
-        b.label === "goal_cage";
-      this.audio?.playHit(intensity, againstWall);
-
-      const support = pair.collision?.supports?.[0];
-      const x =
-        support?.x ?? ((a.position?.x ?? 0) + (b.position?.x ?? 0)) / 2;
-      const y =
-        support?.y ?? ((a.position?.y ?? 0) + (b.position?.y ?? 0)) / 2;
-
-      this.spark(x, y, intensity);
-    }
-  };
 
   private spark(x: number, y: number, intensity: number): void {
     const count = Math.floor(4 + intensity * 14);

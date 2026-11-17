@@ -1,6 +1,7 @@
 # Phase 3 — Separate Game Engine
 
-**Status:** Architecture extraction  
+**Status:** In progress — client renders engine sim (no dual Matter)  
+
 **Depends on:** Phase 2 (local match works)  
 **Unblocks:** Phase 4  
 **Primary owners:** engine / shared types
@@ -90,6 +91,7 @@ const state = game.getState();
 | Tests | unit tests for rules (see checklist) |
 
 Client becomes a **view + input** over engine state (still local; no net).
+Local play: `applyAction` → `step(delta)` each frame → paint sprites from `getState()`.
 
 ---
 
@@ -149,4 +151,4 @@ Call out early:
 
 - Headless Matter / fixed timestep needs to work in Node
 - `TURN_RESOLVED` payload shape (final positions, score, turn, phase, winner)
-- Client will keep a **visual** Matter world for optimistic playback; engine on server is authority
+- Client should **render the engine** (local copy or server snapshots), not a second competing Matter sim

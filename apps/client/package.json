@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@puck-off/game-engine": "*",
+    "@puck-off/shared": "*",
     "phaser": "^3.87.0"
   },
   "devDependencies": {

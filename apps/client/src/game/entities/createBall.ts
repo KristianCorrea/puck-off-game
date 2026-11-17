@@ -28,6 +28,7 @@ export function createBall(scene: Phaser.Scene): BallEntity {
   sprite.setStrokeStyle(u(3), cfg.strokeColor, 1);
   sprite.setDepth(11);
 
+  // Visual proxy only — engine owns ball physics; Matter autoUpdate is off.
   scene.matter.add.gameObject(sprite, {
     shape: { type: "circle", radius: cfg.radius },
     label: "ball",

@@ -1,106 +1,30 @@
 /**
- * Centralized prototype tuning. Phase 2+ will evolve this into GAME_CONFIG.
- *
- * DESIGN_SCALE raises the fixed render resolution so Scale.FIT downscales on
- * large/HiDPI screens instead of upscaling a soft 1240-wide buffer.
- * All world/UI pixel values should go through `u()` or these scaled config fields.
+ * Visual/physics config — re-exported from @puck-off/shared (Phase 3).
  */
-export const DESIGN_SCALE = 2;
+export {
+  DESIGN_SCALE,
+  u,
+  ARENA_CONFIG as PROTOTYPE_ARENA,
+  getFieldBounds,
+  type GoalSide,
+  GAME_CONFIG,
+} from "@puck-off/shared";
 
-/** Scale a design-pixel value into the high-res world. */
-export function u(n: number): number {
-  return n * DESIGN_SCALE;
-}
+import {
+  ARENA_CONFIG,
+  BALL_CONFIG,
+  GOAL_CONFIG,
+  PUCK_CONFIG,
+  SETTLE_CONFIG,
+  SHOT_CONFIG,
+} from "@puck-off/shared";
 
+/** Back-compat shape used across the Phaser client. */
 export const PROTOTYPE_CONFIG = {
-  arena: {
-    /** Full canvas including HUD band + recessed goal pockets */
-    width: u(1240),
-    /** Dedicated top chrome for score / turn / clock */
-    hudHeight: u(104),
-    /** Playable pitch height (below HUD) */
-    playHeight: u(640),
-    /** Total canvas height = hudHeight + playHeight */
-    height: u(744),
-    wallThickness: u(26),
-    cornerRadius: u(18),
-    backgroundColor: 0x071018,
-    floorColor: 0x0f2740,
-    floorAccent: 0x143352,
-    wallColor: 0x5ec8ff,
-    wallInner: 0x1a3a55,
-    lineColor: 0x7dd3fc,
-  },
-
-  goal: {
-    openingHeight: u(200),
-    /** Recessed pocket depth (Soccer Stars–style cage behind the mouth) */
-    depth: u(78),
-    postThickness: u(18),
-    sensorPadding: u(10),
-    color: 0xffb703,
-    netColor: 0xe09f3e,
-    sensorAlpha: 0.14,
-  },
-
-  puck: {
-    radius: u(28),
-    color: 0x2ec4b6,
-    strokeColor: 0x1a9e93,
-    mass: 10,
-    friction: 0.04,
-    frictionAir: 0.02,
-    restitution: 0.55,
-    /** Fraction across the playable field (not including goal pockets) */
-    startXRatio: 0.22,
-    startYRatio: 0.5,
-  },
-
-  ball: {
-    radius: u(16),
-    color: 0xfff7ed,
-    strokeColor: 0xfbbf24,
-    mass: 1.2,
-    friction: 0.02,
-    frictionAir: 0.015,
-    restitution: 0.85,
-  },
-
-  shot: {
-    /** Drag distance (px) that maps to power 1.0 */
-    maxDragPx: u(160),
-    /** Launch speed at power 1.0 (Matter velocity units) — scaled with world */
-    maxSpeed: u(16),
-    minPower: 0.08,
-  },
-
-  settle: {
-    /** Speed below this counts as nearly stopped */
-    sleepSpeed: u(0.08),
-    /** Clamp micro-velocities each frame when below this */
-    stopSpeed: u(0.045),
-  },
+  arena: ARENA_CONFIG,
+  goal: GOAL_CONFIG,
+  puck: PUCK_CONFIG,
+  ball: BALL_CONFIG,
+  shot: SHOT_CONFIG,
+  settle: SETTLE_CONFIG,
 } as const;
-
-export type GoalSide = "player1" | "player2";
-
-/** Playable pitch between the recessed goal pockets (below the HUD band). */
-export function getFieldBounds() {
-  const { width, height, hudHeight, playHeight } = PROTOTYPE_CONFIG.arena;
-  const depth = PROTOTYPE_CONFIG.goal.depth;
-  const left = depth;
-  const right = width - depth;
-  const top = hudHeight;
-  const bottom = height;
-  return {
-    left,
-    right,
-    top,
-    bottom,
-    width: right - left,
-    height: playHeight,
-    centerX: (left + right) / 2,
-    centerY: top + playHeight / 2,
-    hudHeight,
-  };
-}

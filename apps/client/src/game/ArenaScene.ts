@@ -33,6 +33,8 @@ export class ArenaScene extends Phaser.Scene {
     bindLetterboxCamera(this);
     this.matter.world.setBounds(0, 0, width, height, 0, false, false, false, false);
     this.matter.world.disableGravity();
+    // One physics truth: @puck-off/game-engine. Client Matter is display/input only.
+    this.matter.world.autoUpdate = false;
 
     this.audio = new GameAudio(this);
     // Desktop / already-playing: unlock on first pointer in the scene.
@@ -48,7 +50,7 @@ export class ArenaScene extends Phaser.Scene {
 
     createWalls(this);
     drawPitchMarkings(this);
-    const goals = createGoals(this);
+    createGoals(this); // visual cages; scoring is engine-side
 
     const ball = createBall(this);
     const layout = getDefenseLayout();
@@ -76,7 +78,6 @@ export class ArenaScene extends Phaser.Scene {
       audio: this.audio,
       pucks,
       ball,
-      goals,
       onRematch: () => this.queueRematch(),
     });
 

@@ -1,6 +1,6 @@
 import type Phaser from "phaser";
 import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
-import { applyImpulse, type PuckEntity } from "../entities/createPuck";
+import type { PuckEntity } from "../entities/createPuck";
 import { AimIndicator } from "../ui/AimIndicator";
 
 /** World-space travel below this on release counts as a tap (select), not a flick. */
@@ -337,7 +337,7 @@ export class FlickController {
 
     this.clearSelection();
     this.opts.onAimEnd?.();
-    applyImpulse(puck, shot.angle, shot.power);
+    // Physics lives in @puck-off/game-engine — MatchController applies the shot.
     this.opts.onLaunch?.(puck, shot);
   }
 

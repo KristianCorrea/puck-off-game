@@ -18,7 +18,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - **Thin first:** prove the flick (Phase 0–1) before full monorepo / server / engine.
 - **Do not** invent economy, accounts, matchmaking, cosmetics, or formation pickers for MVP.
 - If something is ambiguous, choose the simplest option that preserves core play and isolate it (config / small function).
-- Phase 2 local match is in the client; next formal build step is Phase 3 (`game-engine` / `shared`).
+- Phase 3 underway: `@puck-off/shared` + `@puck-off/game-engine`; client is view/input over the engine.
 
 ## Locked MVP decisions (quick)
 
@@ -32,8 +32,8 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 | Pucks in pocket | Eject onto pitch at end of turn |
 | Win | First to **3** (no match-duration clock) |
 | Turn timer | ~20s; expiry **skips** turn |
-| Net feel | Shooter: optimistic local anim; opponent: wait for `TURN_RESOLVED` |
-| Authority | Server Matter.js = truth; client Matter.js = visual only |
+| Net feel | Shooter: render local/server engine steps; opponent: wait for `TURN_RESOLVED` |
+| Authority | `game-engine` Matter = truth; Phaser paints engine state (no second sim) |
 
 ## Stack (MVP)
 
@@ -47,8 +47,8 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 |--------|--------|
 | Menus / lobby / HUD chrome | React |
 | Arena / aim / bodies | Phaser |
-| Official score, turns, physics | `game-engine` on the **server** |
-| Snappy flick animation | Local Matter in Phaser (visual only) |
+| Official score, turns, physics | `game-engine` (local now; server in Phase 4) |
+| Snappy flick animation | Render engine steps immediately after launch |
 
 ## Working rules for agents
 

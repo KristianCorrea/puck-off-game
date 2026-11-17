@@ -2,12 +2,15 @@
   "name": "puck-off",
   "private": true,
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @puck-off/client",
     "build": "npm run build -w @puck-off/client",
-    "preview": "npm run preview -w @puck-off/client"
+    "preview": "npm run preview -w @puck-off/client",
+    "test": "npm run test -w @puck-off/game-engine",
+    "typecheck": "npm run typecheck -w @puck-off/shared && npm run typecheck -w @puck-off/game-engine && npm run build -w @puck-off/client --if-present"
   },
   "engines": {
     "node": ">=20"

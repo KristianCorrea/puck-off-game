@@ -1,56 +1,14 @@
-import { PROTOTYPE_CONFIG } from "./prototypeConfig";
+/**
+ * Match rules — shared package is source of truth (Phase 3).
+ */
+export {
+  MATCH_CONFIG,
+  GAME_CONFIG,
+  getFieldBounds,
+  type PlayerId,
+  type MatchPhase,
+  type MatchResult,
+  type GoalSide,
+} from "@puck-off/shared";
 
-/** Match rules for Phase 2 local play (evolves into shared GAME_CONFIG). */
-export const MATCH_CONFIG = {
-  pucksPerPlayer: 5,
-  /** First to this many goals wins (no match clock). */
-  maxGoals: 3,
-  /** Per-turn move limit; expire → skip turn */
-  turnDurationMs: 20_000,
-  /** Frames all bodies must stay under stopSpeed before settle */
-  settleStableFrames: 14,
-  /** Safety cap so a turn cannot hang forever */
-  settleMaxMs: 10_000,
-  /** Hold the scored positions so players can see the goal before reset */
-  goalCelebrationMs: 5_000,
-  /**
-   * Anti-turtling: if a puck ends a turn inside a goal, eject it this far
-   * into the pitch (fraction of field width from that side's mouth).
-   * Past the natural defensive cluster so camping leaves the goal open.
-   */
-  goalEjectFieldRatio: 0.187,
-  players: {
-    player1: {
-      id: "player1" as const,
-      label: "Player 1",
-      short: "P1",
-      color: 0x2dd4bf,
-      strokeColor: 0xf0fdfa,
-    },
-    player2: {
-      id: "player2" as const,
-      label: "Player 2",
-      short: "P2",
-      color: 0xfb7185,
-      strokeColor: 0xfff1f2,
-    },
-  },
-} as const;
-
-export type PlayerId = keyof typeof MATCH_CONFIG.players;
-
-export type MatchPhase =
-  | "PLAYER_TURN"
-  | "PHYSICS_RESOLUTION"
-  | "GOAL_RESOLUTION"
-  | "MATCH_END";
-
-export type MatchResult = "player1" | "player2" | "draw" | null;
-
-/** Physics + arena still live in prototypeConfig for Phase 1 continuity. */
-export { PROTOTYPE_CONFIG, getFieldBounds, type GoalSide } from "./prototypeConfig";
-
-export const GAME_CONFIG = {
-  ...PROTOTYPE_CONFIG,
-  match: MATCH_CONFIG,
-} as const;
+export { PROTOTYPE_CONFIG } from "./prototypeConfig";

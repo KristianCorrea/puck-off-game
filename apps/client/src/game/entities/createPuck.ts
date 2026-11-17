@@ -31,6 +31,7 @@ export function createPuckAt(
   ring.setDepth(12.1);
   sprite.setData("shine", ring);
 
+  // Visual proxy only — ArenaScene disables Matter autoUpdate; Match paints these.
   scene.matter.add.gameObject(sprite, {
     shape: { type: "circle", radius: cfg.radius },
     label: opts.id,
@@ -68,31 +69,7 @@ export function resetPuckToSpawn(
   scene: Phaser.Scene,
   puck: PuckEntity,
 ): void {
-  const body = puck.body;
-  body.isSleeping = false;
-  scene.matter.body.setPosition(body, { x: puck.spawnX, y: puck.spawnY });
-  scene.matter.body.setVelocity(body, { x: 0, y: 0 });
-  scene.matter.body.setAngularVelocity(body, 0);
-}
-
-/** Apply a normalized shot. angle is radians; power is 0..1. */
-export function applyImpulse(
-  puck: PuckEntity,
-  angle: number,
-  power: number,
-): void {
-  const clamped = Math.min(
-    1,
-    Math.max(PROTOTYPE_CONFIG.shot.minPower, power),
-  );
-  const speed = clamped * PROTOTYPE_CONFIG.shot.maxSpeed;
-  const vx = Math.cos(angle) * speed;
-  const vy = Math.sin(angle) * speed;
-
-  const body = puck.body;
-  body.isSleeping = false;
-
-  const matterBody = puck.sprite.scene.matter.body;
-  matterBody.setAngularVelocity(body, 0);
-  matterBody.setVelocity(body, { x: vx, y: vy });
+  scene.matter.body.setPosition(puck.body, { x: puck.spawnX, y: puck.spawnY });
+  scene.matter.body.setVelocity(puck.body, { x: 0, y: 0 });
+  scene.matter.body.setAngularVelocity(puck.body, 0);
 }
