@@ -2,6 +2,7 @@ import type Phaser from "phaser";
 import { getFieldBounds } from "../config/prototypeConfig";
 import type { MatchPhase, MatchResult, PlayerId } from "../config/gameConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
+import { GoalCelebration } from "../ui/GoalCelebration";
 import type { ScoreKeeper } from "./ScoreKeeper";
 import type { MatchTimer } from "./MatchTimer";
 import type { TurnManager } from "./TurnManager";
@@ -15,11 +16,13 @@ export class MatchHud {
   private readonly timerText: Phaser.GameObjects.Text;
   private readonly bannerText: Phaser.GameObjects.Text;
   private readonly rematchText: Phaser.GameObjects.Text;
+  private readonly celebration: GoalCelebration;
   private readonly onRematch: () => void;
 
   constructor(scene: Phaser.Scene, opts: { onRematch: () => void }) {
     this.scene = scene;
     this.onRematch = opts.onRematch;
+    this.celebration = new GoalCelebration(scene);
     const field = getFieldBounds();
     const pad = 24;
 
@@ -110,8 +113,18 @@ export class MatchHud {
     scene.input.keyboard?.on("keydown-R", this.onRematchKey, this);
   }
 
+  /** Kick off the party once when a goal is scored. */
+  playGoalCelebration(): void {
+    this.celebration.play();
+  }
+
+  stopGoalCelebration(): void {
+    this.celebration.stop();
+  }
+
   destroy(): void {
     this.scene.input.keyboard?.off("keydown-R", this.onRematchKey, this);
+    this.celebration.destroy();
     this.rematchText.destroy();
     this.bannerText.destroy();
     this.turnText.destroy();
@@ -159,9 +172,8 @@ export class MatchHud {
 
     if (phase === "GOAL_RESOLUTION") {
       this.turnText.setColor("#ffe066");
-      this.turnText.setText("Goal!");
-      this.bannerText.setText("GOAL!");
-      this.bannerText.setVisible(true);
+      this.turnText.setText("GOAL!!!");
+      // Banner/party owned by GoalCelebration — don't stomp its tweens.
       return;
     }
 

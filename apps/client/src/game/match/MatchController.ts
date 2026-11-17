@@ -152,6 +152,7 @@ export class MatchController {
 
     this.score.awardForGoalIn(goalSide);
     this.goalPauseMs = MATCH_CONFIG.goalCelebrationMs;
+    this.hud.playGoalCelebration();
 
     const winner = this.score.hasWinner();
     if (winner) {
@@ -215,6 +216,7 @@ export class MatchController {
     this.goalPauseMs -= deltaMs;
     if (this.goalPauseMs > 0) return;
 
+    this.hud.stopGoalCelebration();
     this.resetBallMidfield();
     this.resetAllPucksToSpawn();
 
