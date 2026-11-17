@@ -1,9 +1,21 @@
 import Phaser from "phaser";
 import type { GameAudio } from "../audio/GameAudio";
-import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
+import {
+  PROTOTYPE_CONFIG,
+  getFieldBounds,
+  u,
+} from "../config/prototypeConfig";
 import type { BallEntity } from "../entities/createBall";
 import type { PuckEntity } from "../entities/createPuck";
 import { ensureFxParticleTexture, FX_PARTICLE_KEY } from "./fxTextures";
+
+type MotionSample = {
+  id: string;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+};
 
 type TrailTarget = {
   id: string;
@@ -33,7 +45,10 @@ export class GameFx {
   private chargeJoltCooldownMs = 0;
   private readonly chargeJolts: ChargeJolt[] = [];
   private readonly ephemeral: Phaser.GameObjects.GameObject[] = [];
-  private readonly prevSpeeds = new Map<string, number>();
+  private readonly prevMotion = new Map<
+    string,
+    { vx: number; vy: number; x: number; y: number }
+  >();
 
   constructor(
     scene: Phaser.Scene,
@@ -48,8 +63,8 @@ export class GameFx {
       this.trailTargets.push({
         id: puck.id,
         getPos: () => ({
-          x: puck.body.position.x,
-          y: puck.body.position.y,
+          x: puck.sprite.x,
+          y: puck.sprite.y,
         }),
         getSpeed: () =>
           Math.hypot(puck.body.velocity.x, puck.body.velocity.y),
@@ -59,8 +74,8 @@ export class GameFx {
     this.trailTargets.push({
       id: "ball",
       getPos: () => ({
-        x: opts.ball.body.position.x,
-        y: opts.ball.body.position.y,
+        x: opts.ball.sprite.x,
+        y: opts.ball.sprite.y,
       }),
       getSpeed: () =>
         Math.hypot(opts.ball.body.velocity.x, opts.ball.body.velocity.y),
@@ -70,26 +85,62 @@ export class GameFx {
     for (const t of this.trailTargets) {
       this.trails.set(t.id, this.createTrailEmitter(t.color));
     }
+  }
 
-    // Collision sparks come from observeSpeeds() — client Matter does not simulate.
+  /** Call when a new shot starts so launch impulse isn't treated as an impact. */
+  resetMotionTracking(): void {
+    this.prevMotion.clear();
   }
 
   /**
-   * Approximate impact FX from engine-driven velocity changes (no local Matter steps).
+   * Impact FX from engine-driven velocity changes (no local Matter collisions).
+   * Uses |Δv| so elastic wall bounces still register (speed often barely drops).
    */
-  observeSpeeds(
-    samples: { id: string; x: number; y: number; speed: number }[],
-  ): void {
+  observeMotion(samples: MotionSample[]): void {
+    const minImpulse = u(1.2);
+    const minPrevSpeed = u(0.8);
+
     for (const s of samples) {
-      const prev = this.prevSpeeds.get(s.id) ?? s.speed;
-      const drop = prev - s.speed;
-      if (drop >= u(1.5) && prev >= u(2)) {
-        const intensity = Math.min(1, drop / u(12));
-        this.audio?.playHit(intensity, false);
-        this.spark(s.x, s.y, intensity);
-      }
-      this.prevSpeeds.set(s.id, s.speed);
+      const prev = this.prevMotion.get(s.id);
+      this.prevMotion.set(s.id, { vx: s.vx, vy: s.vy, x: s.x, y: s.y });
+      if (!prev) continue;
+
+      const prevSpeed = Math.hypot(prev.vx, prev.vy);
+      const speed = Math.hypot(s.vx, s.vy);
+      const dv = Math.hypot(s.vx - prev.vx, s.vy - prev.vy);
+      if (dv < minImpulse) continue;
+
+      // Heavy puck barely slows vs light ball — first contact often only
+      // shows up as the resting body suddenly gaining speed.
+      const struckFromRest =
+        prevSpeed < minPrevSpeed && speed >= minImpulse;
+
+      const dot = prev.vx * s.vx + prev.vy * s.vy;
+      const aligned = prevSpeed * speed > 1e-6 ? dot / (prevSpeed * speed) : 1;
+      const slowed = speed < prevSpeed * 0.92;
+      const redirected = aligned < 0.85;
+      const movingImpact =
+        prevSpeed >= minPrevSpeed && (slowed || redirected);
+
+      if (!struckFromRest && !movingImpact) continue;
+
+      const intensity = Math.min(1, dv / u(12));
+      if (intensity < 0.08) continue;
+
+      this.audio?.playHit(intensity, this.nearArenaBoundary(s.x, s.y));
+      this.spark(s.x, s.y, intensity);
     }
+  }
+
+  private nearArenaBoundary(x: number, y: number): boolean {
+    const field = getFieldBounds();
+    const margin = PROTOTYPE_CONFIG.ball.radius * 2.5;
+    return (
+      x <= field.left + margin ||
+      x >= field.right - margin ||
+      y <= field.top + margin ||
+      y >= field.bottom - margin
+    );
   }
 
   /**
@@ -197,7 +248,7 @@ export class GameFx {
   }
 
   destroy(): void {
-    this.prevSpeeds.clear();
+    this.prevMotion.clear();
     this.hideCharge();
     this.chargeGfx.destroy();
     for (const emitter of this.trails.values()) emitter.destroy();

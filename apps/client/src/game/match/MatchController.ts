@@ -95,6 +95,7 @@ export class MatchController {
         });
         if (!started.ok) return;
 
+        this.fx.resetMotionTracking();
         this.syncFromEngine(started.state, { paintBodies: true });
         this.timer.stop();
         this.flick.setEnabled(false);
@@ -229,12 +230,19 @@ export class MatchController {
     matter.body.setAngularVelocity(this.ball.body, state.ball.angularVelocity);
     this.ball.sprite.setPosition(state.ball.position.x, state.ball.position.y);
 
-    const samples: { id: string; x: number; y: number; speed: number }[] = [
+    const samples: {
+      id: string;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+    }[] = [
       {
         id: "ball",
         x: state.ball.position.x,
         y: state.ball.position.y,
-        speed: Math.hypot(state.ball.velocity.x, state.ball.velocity.y),
+        vx: state.ball.velocity.x,
+        vy: state.ball.velocity.y,
       },
     ];
 
@@ -251,12 +259,13 @@ export class MatchController {
         id: puckState.id,
         x: puckState.position.x,
         y: puckState.position.y,
-        speed: Math.hypot(puckState.velocity.x, puckState.velocity.y),
+        vx: puckState.velocity.x,
+        vy: puckState.velocity.y,
       });
     }
 
     if (state.phase === "PHYSICS_RESOLUTION") {
-      this.fx.observeSpeeds(samples);
+      this.fx.observeMotion(samples);
     }
   }
 
