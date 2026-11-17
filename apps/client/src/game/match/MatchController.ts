@@ -74,7 +74,8 @@ export class MatchController {
   update(deltaMs: number): void {
     this.dampenAll();
 
-    if (this.phase !== "MATCH_END") {
+    // Match clock pauses during goal celebration and match end.
+    if (this.phase === "PLAYER_TURN" || this.phase === "PHYSICS_RESOLUTION") {
       if (this.timer.tick(deltaMs)) {
         this.endOnTimer();
         return;
@@ -131,9 +132,9 @@ export class MatchController {
     this.phase = "GOAL_RESOLUTION";
     this.flick.setEnabled(false);
     this.score.awardForGoalIn(goalSide);
-    this.resetBallMidfield();
-    this.resetAllPucksToSpawn();
-    this.goalPauseMs = 900;
+    // Hold the scored positions — reset only after celebration.
+    this.freezeAllBodies();
+    this.goalPauseMs = MATCH_CONFIG.goalCelebrationMs;
 
     const winner = this.score.hasWinner();
     if (winner) {
@@ -193,8 +194,13 @@ export class MatchController {
   }
 
   private updateGoalResolution(deltaMs: number): void {
+    // Keep the goal moment frozen while players take it in.
+    this.freezeAllBodies();
     this.goalPauseMs -= deltaMs;
     if (this.goalPauseMs > 0) return;
+
+    this.resetBallMidfield();
+    this.resetAllPucksToSpawn();
 
     if (this.result) {
       this.phase = "MATCH_END";
@@ -206,6 +212,17 @@ export class MatchController {
     this.turns.advance();
     this.phase = "PLAYER_TURN";
     this.flick.setEnabled(true);
+  }
+
+  /** Stop every body so the scored frame holds during celebration. */
+  private freezeAllBodies(): void {
+    const matter = this.scene.matter;
+    const bodies = [this.ball.body, ...this.pucks.map((p) => p.body)];
+    for (const body of bodies) {
+      body.isSleeping = false;
+      matter.body.setVelocity(body, { x: 0, y: 0 });
+      matter.body.setAngularVelocity(body, 0);
+    }
   }
 
   private endOnTimer(): void {

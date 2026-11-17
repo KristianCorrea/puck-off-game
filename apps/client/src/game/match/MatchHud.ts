@@ -88,6 +88,8 @@ export class MatchHud {
     if (phase === "GOAL_RESOLUTION") {
       this.turnText.setColor("#ffe066");
       this.turnText.setText("Goal!");
+      this.bannerText.setText("GOAL!");
+      this.bannerText.setVisible(true);
       return;
     }
 

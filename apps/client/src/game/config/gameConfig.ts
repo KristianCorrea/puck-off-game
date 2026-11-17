@@ -10,6 +10,8 @@ export const MATCH_CONFIG = {
   settleStableFrames: 14,
   /** Safety cap so a turn cannot hang forever */
   settleMaxMs: 10_000,
+  /** Hold the scored positions so players can see the goal before reset */
+  goalCelebrationMs: 5_000,
   players: {
     player1: {
       id: "player1" as const,
