@@ -12,13 +12,15 @@ import { MatchController } from "./match/MatchController";
  * Phase 2: full local hot-seat match on one machine.
  */
 export class ArenaScene extends Phaser.Scene {
-  private match!: MatchController;
+  private match: MatchController | null = null;
+  private restartQueued = false;
 
   constructor() {
     super("ArenaScene");
   }
 
   create(): void {
+    this.restartQueued = false;
     const { width, height, backgroundColor, hudHeight } = PROTOTYPE_CONFIG.arena;
 
     this.cameras.main.setBackgroundColor(backgroundColor);
@@ -62,17 +64,25 @@ export class ArenaScene extends Phaser.Scene {
       pucks,
       ball,
       goals,
-      onRematch: () => {
-        this.scene.restart();
-      },
+      onRematch: () => this.queueRematch(),
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-      this.match.destroy();
+      this.match?.destroy();
+      this.match = null;
     });
   }
 
   update(_time: number, delta: number): void {
-    this.match.update(delta);
+    this.match?.update(delta);
+  }
+
+  /** Defer restart so we don't tear down the scene inside a pointer/key callback. */
+  private queueRematch(): void {
+    if (this.restartQueued) return;
+    this.restartQueued = true;
+    this.time.delayedCall(0, () => {
+      this.scene.restart();
+    });
   }
 }
