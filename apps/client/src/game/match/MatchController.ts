@@ -16,6 +16,7 @@ import {
   resetPuckToSpawn,
   type PuckEntity,
 } from "../entities/createPuck";
+import { GameFx } from "../fx/GameFx";
 import { FlickController } from "../input/FlickController";
 import { MatchHud, highlightActivePucks } from "./MatchHud";
 import { MatchTimer } from "./MatchTimer";
@@ -39,6 +40,7 @@ export class MatchController {
   private readonly goals: GoalSensors;
   private readonly flick: FlickController;
   private readonly hud: MatchHud;
+  private readonly fx: GameFx;
 
   private stableFrames = 0;
   private settleElapsedMs = 0;
@@ -56,13 +58,35 @@ export class MatchController {
     this.ball = opts.ball;
     this.goals = opts.goals;
     this.hud = new MatchHud(opts.scene, { onRematch: opts.onRematch });
+    this.fx = new GameFx(opts.scene, {
+      pucks: opts.pucks,
+      ball: opts.ball,
+    });
 
     this.flick = new FlickController(opts.scene, {
       getSelectablePucks: () =>
         this.phase === "PLAYER_TURN"
           ? this.pucks.filter((p) => p.ownerId === this.turns.current)
           : [],
-      onLaunch: () => this.beginPhysicsResolution(),
+      onAim: (puck, shot) => {
+        this.fx.showCharge(
+          puck.body.position.x,
+          puck.body.position.y,
+          shot.power,
+          puck.sprite.fillColor,
+        );
+      },
+      onAimEnd: () => this.fx.hideCharge(),
+      onLaunch: (puck, shot) => {
+        this.fx.playLaunch(
+          puck.body.position.x,
+          puck.body.position.y,
+          shot.angle,
+          shot.power,
+          puck.sprite.fillColor,
+        );
+        this.beginPhysicsResolution();
+      },
     });
     this.flick.bindPucks(this.pucks);
     this.enterPlayerTurn();
@@ -72,10 +96,12 @@ export class MatchController {
   destroy(): void {
     this.flick.destroy();
     this.hud.destroy();
+    this.fx.destroy();
   }
 
   update(deltaMs: number): void {
     this.dampenAll();
+    this.fx.update(deltaMs);
 
     // Only the active player's move clock runs.
     if (this.phase === "PLAYER_TURN") {

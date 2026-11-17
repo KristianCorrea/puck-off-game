@@ -1,8 +1,9 @@
-import Phaser from "phaser";
+import type Phaser from "phaser";
 import { PROTOTYPE_CONFIG } from "../config/prototypeConfig";
 
 /**
  * Slingshot aim: drag away from puck; arrow shows launch direction (opposite drag).
+ * Charge rings are drawn by GameFx — this stays arrow-only.
  */
 export class AimIndicator {
   private readonly graphics: Phaser.GameObjects.Graphics;
@@ -17,6 +18,7 @@ export class AimIndicator {
     originY: number,
     angle: number,
     power: number,
+    color = 0xffe066,
   ): void {
     this.visible = true;
     const g = this.graphics;
@@ -28,17 +30,25 @@ export class AimIndicator {
     const endY = originY + Math.sin(angle) * length;
 
     const strength = 0.45 + power * 0.55;
-    g.lineStyle(4, 0xffe066, strength);
+    const tipColor = power > 0.7 ? 0xff6b6b : color;
+
+    // Soft power glow behind the arrow
+    g.lineStyle(10, tipColor, 0.12 + power * 0.18);
     g.beginPath();
     g.moveTo(originX, originY);
     g.lineTo(endX, endY);
     g.strokePath();
 
-    // Arrow head
+    g.lineStyle(4, tipColor, strength);
+    g.beginPath();
+    g.moveTo(originX, originY);
+    g.lineTo(endX, endY);
+    g.strokePath();
+
     const head = 14 + power * 8;
     const left = angle + Math.PI * 0.82;
     const right = angle - Math.PI * 0.82;
-    g.fillStyle(0xffe066, strength);
+    g.fillStyle(tipColor, strength);
     g.fillTriangle(
       endX,
       endY,
@@ -48,7 +58,6 @@ export class AimIndicator {
       endY + Math.sin(right) * head,
     );
 
-    // Power ticks near puck
     const ticks = 5;
     for (let i = 1; i <= ticks; i++) {
       const t = i / ticks;

@@ -30,7 +30,15 @@ type PendingPress = {
 
 export type FlickControllerOptions = {
   getSelectablePucks: () => PuckEntity[];
-  onLaunch?: (puck: PuckEntity) => void;
+  onLaunch?: (
+    puck: PuckEntity,
+    shot: { angle: number; power: number },
+  ) => void;
+  onAim?: (
+    puck: PuckEntity,
+    shot: { angle: number; power: number },
+  ) => void;
+  onAimEnd?: () => void;
 };
 
 type PuckHandler = (
@@ -204,8 +212,9 @@ export class FlickController {
     }
 
     this.clearSelection();
+    this.opts.onAimEnd?.();
     applyImpulse(puck, shot.angle, shot.power);
-    this.opts.onLaunch?.(puck);
+    this.opts.onLaunch?.(puck, shot);
   }
 
   private beginDrag(
@@ -228,6 +237,7 @@ export class FlickController {
     this.drag.puck = null;
     this.drag.relativeToGesture = false;
     this.aim.hide();
+    this.opts.onAimEnd?.();
   }
 
   private clearSelection(): void {
@@ -240,10 +250,12 @@ export class FlickController {
     const shot = this.computeShot(pointer, puck);
     if (!shot) {
       this.aim.hide();
+      this.opts.onAimEnd?.();
       return;
     }
     const { x, y } = puck.body.position;
-    this.aim.show(x, y, shot.angle, shot.power);
+    this.aim.show(x, y, shot.angle, shot.power, puck.sprite.fillColor);
+    this.opts.onAim?.(puck, shot);
   }
 
   private pointerWorld(pointer: Phaser.Input.Pointer): { x: number; y: number } {
