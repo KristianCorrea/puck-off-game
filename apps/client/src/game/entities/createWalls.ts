@@ -23,7 +23,7 @@ const wallOpts = {
 export function createWalls(scene: Phaser.Scene): WallBodies {
   const { wallThickness, wallColor, wallInner, floorColor, floorAccent } =
     PROTOTYPE_CONFIG.arena;
-  const { openingHeight, depth, color } = PROTOTYPE_CONFIG.goal;
+  const { openingHeight, depth } = PROTOTYPE_CONFIG.goal;
   const field = getFieldBounds();
   const matter = scene.matter;
 
@@ -141,22 +141,7 @@ export function createWalls(scene: Phaser.Scene): WallBodies {
     wallThickness - inset,
   );
 
-  // Mouth edge highlights
-  g.lineStyle(3, color, 0.95);
-  g.strokeRect(
-    field.left,
-    field.centerY - halfOpen,
-    wallThickness,
-    openingHeight,
-  );
-  g.strokeRect(
-    field.right - wallThickness,
-    field.centerY - halfOpen,
-    wallThickness,
-    openingHeight,
-  );
-
-  // Pocket floors
+  // Pocket floors (mouth yellow trim is drawn with the goals)
   g.fillStyle(0x0a1624, 1);
   g.fillRect(
     0,

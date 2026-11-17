@@ -196,23 +196,30 @@ function drawGoalVisuals(
   g.fillRect(fieldRight, mouthTop, depth - postThickness, openingHeight);
 
   g.fillStyle(color, 0.98);
+  // Back boards
   g.fillRect(
     0,
     mouthTop - postThickness,
     postThickness,
     openingHeight + postThickness * 2,
   );
-  g.fillRect(0, mouthTop - postThickness, depth, postThickness);
-  g.fillRect(0, mouthBottom, depth, postThickness);
   g.fillRect(
     fieldRight + depth - postThickness,
     mouthTop - postThickness,
     postThickness,
     openingHeight + postThickness * 2,
   );
-  g.fillRect(fieldRight, mouthTop - postThickness, depth, postThickness);
-  g.fillRect(fieldRight, mouthBottom, depth, postThickness);
 
+  // Top/bottom rails: pocket through wall thickness so entrance corners are yellow
+  const leftRailW = depth + wallThickness;
+  const rightRailX = fieldRight - wallThickness;
+  const rightRailW = depth + wallThickness;
+  g.fillRect(0, mouthTop - postThickness, leftRailW, postThickness);
+  g.fillRect(0, mouthBottom, leftRailW, postThickness);
+  g.fillRect(rightRailX, mouthTop - postThickness, rightRailW, postThickness);
+  g.fillRect(rightRailX, mouthBottom, rightRailW, postThickness);
+
+  // Pitch-face mouth trim (yellow starts at the goal area entrance)
   g.lineStyle(3, color, 1);
   g.strokeRect(fieldLeft, mouthTop, wallThickness, openingHeight);
   g.strokeRect(
