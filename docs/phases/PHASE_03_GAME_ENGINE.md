@@ -39,7 +39,7 @@ puck-off/
 │   │       ├── MatchState.ts
 │   │       ├── GameRules.ts
 │   │       ├── TurnManager.ts
-│   │       ├── handleGoal.ts      # midfield reset; pucks stay
+│   │       ├── handleGoal.ts      # ball midfield + pucks reset to start layout
 │   │       ├── physics/
 │   │       │   ├── MatterWorld.ts
 │   │       │   └── settle.ts
@@ -84,8 +84,8 @@ const state = game.getState();
 | Validation | turn, ownership, phase, power clamp |
 | Physics | Matter sim until settled + max timeout |
 | Scoring | normal + own goal |
-| Goals | `handleGoal()` → ball midfield, clear velocity, pucks unchanged |
-| Win / timer / draw | same as Phase 2 |
+| Goals | `handleGoal()` → ball midfield, clear velocities, **pucks reset** to start layout |
+| Win / turn timer | First to 3; ~20s turn clock skips turn (same as Phase 2) |
 | Layout | defense layout from config |
 | Tests | unit tests for rules (see checklist) |
 
@@ -109,9 +109,10 @@ Client becomes a **view + input** over engine state (still local; no net).
 - [ ] Cannot control opponent puck
 - [ ] Reusable pucks (no `used` flag required)
 - [ ] Scoring + own goals
-- [ ] Midfield ball reset; pucks persist
+- [ ] After goal: ball midfield + pucks reset to start layout
+- [ ] End of turn: eject pucks from goal pockets
 - [ ] First to 3 ends immediately
-- [ ] Timer expiry win / draw
+- [ ] Turn timer expiry skips turn (match continues)
 - [ ] Invalid action rejected (wrong turn, bad power, etc.)
 - [ ] Full short match sequence
 

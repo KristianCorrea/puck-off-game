@@ -37,8 +37,8 @@ Ask every session (or as many as time allows):
 - Are goals too easy / too hard?
 - Is the arena the right size?
 - Are goals the right size?
-- Is the timer long enough?
-- Does persistent board state create interesting strategy?
+- Is the ~20s turn timer long enough?
+- Does resetting pucks after goals keep scoring clear without feeling unfair?
 - Is it obvious whose turn it is?
 - Does the defense-oriented start feel right?
 - Does the opponent wait for `TURN_RESOLVED` feel acceptable?

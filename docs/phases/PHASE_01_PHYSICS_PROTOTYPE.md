@@ -309,6 +309,6 @@ Keep these seams:
 | `ballInGoalSide(...)` | `createGoals.ts` |
 | `FlickController.setEnabled(false)` | disable input while “physics resolving” later |
 
-Phase 2 adds: 5 pucks, turns, score (incl. own goals), midfield ball reset, timer, first-to-3 — **on top of this scene**, without rewriting Matter wiring.
+Phase 2 adds: 5 pucks, turns, score (incl. own goals), after-goal ball midfield + **puck reset**, turn timer skip, first-to-3 — **on top of this scene**, without rewriting Matter wiring.
 
 Do not extract `packages/game-engine` yet — that is Phase 3.

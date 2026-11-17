@@ -25,9 +25,10 @@ Create room
   → Both ready
   → Countdown
   → Turns with optimistic shooter / waiting opponent
-  → Goals (incl. own goals) + midfield ball reset
-  → First to 3 OR timer expiry
-  → Match end (win / loss / draw)
+  → Goals (incl. own goals) + midfield ball + **pucks reset**
+  → First to 3
+  → Turn timer skip when a player idles out
+  → Match end (win) + rematch/leave
 ```
 
 Both clients must finish every turn on the **same** authoritative result.
@@ -73,9 +74,9 @@ type MatchPhase =
 | Lobby flow | Create, join by code, waiting, ready |
 | Countdown | Both see same start |
 | Turn loop | Full online turns until end condition |
-| Goal path | Score update, midfield reset, continue or end |
-| Timer | Server-authored remaining time in sync messages |
-| Result | Both clients show consistent winner/draw |
+| Goal path | Score update, ball midfield + **pucks reset**, continue or end |
+| Turn timer | Server-authored per-turn clock; expiry skips turn |
+| Result | Both clients show consistent winner |
 | Rematch | Optional; simple “back to lobby / new room” is OK |
 
 ---
@@ -98,8 +99,8 @@ Two people / two windows:
 1. P1 creates → shares code  
 2. P2 joins → both ready  
 3. Countdown → P1 turn  
-4. P1 scores → both see 1-0, ball midfield, pucks stayed  
-5. Play until 3 goals **or** force a timer end in a debug build  
+4. P1 scores → both see 1-0, ball midfield, **pucks reset** to start layout  
+5. Play until first to 3 (optionally idle out a turn to confirm skip)  
 6. Confirm result screen matches on both sides  
 
 Also run one own-goal and confirm opponent scored.

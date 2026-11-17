@@ -46,7 +46,7 @@ apps/client/src/
 │   ├── MatchScreen.tsx          # mounts Phaser; does NOT own physics positions in React state
 │   └── ResultScreen.tsx
 ├── components/
-│   ├── Hud.tsx                  # score, timer, turn, connection
+│   ├── Hud.tsx                  # score, turn clock, turn, connection
 │   └── ConnectionBadge.tsx
 ├── game/                        # Phaser remains arena owner
 └── networking/
@@ -86,7 +86,7 @@ Also show connection status. No “remaining pucks” meter (pucks are reusable)
 | Join | Code entry + errors (full/invalid) |
 | Lobby | Who’s in, ready state |
 | Match | Whose turn, score, time |
-| Result | Win / loss / draw + next action |
+| Result | Win / loss + rematch or return-to-menu |
 
 Keep visuals readable and simple. Brand polish can wait; clarity cannot.
 
@@ -116,7 +116,7 @@ Keep visuals readable and simple. Brand polish can wait; clarity cannot.
 ## Definition of Done
 
 - [ ] New player can create/join without reading the plan
-- [ ] HUD answers: whose turn, score, time, connection
+- [ ] HUD answers: whose turn, score, turn clock, connection
 - [ ] Result screen matches server outcome
 - [ ] Rematch or return-to-menu works
 - [ ] No React per-frame physics binding

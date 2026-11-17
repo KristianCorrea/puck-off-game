@@ -25,6 +25,8 @@ These decisions are locked for the MVP unless explicitly changed later:
 | Arena after goal | **Pucks reset** to defense starting layout; ball midfield |
 | Goal detection | **Ball center** enters goal pocket → score **immediately** (no settle wait) |
 | Pucks in goal | At end of turn, any puck center still in a pocket is **ejected** onto the pitch |
+| Win condition | **First to 3** ends the match immediately (no match-duration clock in MVP) |
+| Turn timer | **~20s** per turn; expiry **skips** the turn (does not end the match) |
 | Physics feel (shooter) | **Optimistic local animation** on release — snappy, immediate |
 | Physics sync (opponent) | **Wait for `TURN_RESOLVED`** — no `LAUNCH_CONFIRMED` required for MVP |
 | Authority | Server Matter.js is truth; client Matter.js is visual playback only |
@@ -54,13 +56,11 @@ Players alternate turns.
 
 A player makes one move, physics completely resolves, and then the opponent gets their turn.
 
-The arena is persistent throughout the match. Pucks remain where they end up and can continue being used throughout the entire game.
+Between goals, pucks stay where they settle and can be reused on later turns. **After a goal**, all pucks reset to the defense starting layout and the ball returns to midfield.
 
-The first player to score **3 goals** wins.
+The first player to score **3 goals** wins immediately.
 
-If the timer expires before either player reaches 3 goals, the player with the higher score wins.
-
-If the score is tied when time expires, the match is a draw.
+Each turn has a short move clock (~20s). If it expires, that turn is skipped — the match continues.
 
 ---
 
@@ -161,16 +161,12 @@ When a player flicks a puck:
    - other pucks
    - walls
 4. The puck eventually comes to rest.
-5. It remains at its final position.
+5. It remains at its final position **until the next goal** (or until ejected from a goal pocket at end of turn).
 6. The player can use that same puck again on a future turn.
 
-Used pucks are NOT removed.
+Used pucks are NOT removed from the roster — all 5 stay available every turn.
 
-Pucks should NOT reset after goals.
-
-The board should become progressively more dynamic as pucks move around the arena.
-
-This persistent board state is an important part of the strategy.
+**After a goal:** every puck resets to the defense starting layout (velocities cleared). Between goals, settled positions are the strategic board state.
 
 ---
 
@@ -195,6 +191,8 @@ Physics resolves
    ↓
 Player 1
 ```
+
+Each turn has a move clock (~20s). If time expires before a flick, the turn is skipped and play passes to the opponent.
 
 A player cannot:
 
@@ -328,7 +326,7 @@ If the ball enters **your own** goal (own goal):
 opponent +1
 ```
 
-Own goals count the same as a normal goal for win conditions (first to 3, timer, etc.).
+Own goals count the same as a normal goal for win conditions (first to 3).
 
 After any goal, the match immediately checks whether either player has reached 3 goals.
 
@@ -376,42 +374,24 @@ No additional turn is given.
 
 ---
 
-# 12. TIMER
+# 12. TURN TIMER
 
-Matches have a configurable timer.
-
-If the timer reaches zero before either player reaches 3 goals:
+MVP uses a **per-turn move clock**, not a match-duration clock.
 
 ```text
-Higher score = winner
-Equal score = draw
+turnDurationMs ≈ 20_000
 ```
 
-Example:
+Behavior:
 
-```text
-Player 1: 2
-Player 2: 1
+- Clock runs only during `PLAYER_TURN`
+- If it hits zero before a flick → **skip turn** (advance to the opponent)
+- Skipping does **not** end the match or award a winner
+- First to 3 remains the only MVP win condition
 
-TIME EXPIRES
+On the server (later phases), the turn timer is authoritative.
 
-Player 1 wins.
-```
-
-Example:
-
-```text
-Player 1: 2
-Player 2: 2
-
-TIME EXPIRES
-
-DRAW
-```
-
-The timer is authoritative on the server.
-
-Never trust a client-provided timer.
+Never trust a client-provided timer value.
 
 ---
 
@@ -941,7 +921,8 @@ Example:
 export const GAME_CONFIG = {
   maxGoals: 3,
 
-  matchDurationMs: 180000,
+  /** Per-turn move clock; expiry skips the turn (not a match clock). */
+  turnDurationMs: 20_000,
 
   pucksPerPlayer: 5,
 
@@ -949,7 +930,9 @@ export const GAME_CONFIG = {
 
   ballReset: "midfield",
 
+  /** After a goal, pucks return to this layout. */
   startingLayout: "defense",
+  pucksResetAfterGoal: true,
 
   physics: {
     puckMass: 10,
@@ -1181,11 +1164,9 @@ Implement:
 - goals + own goals (opponent +1); ball-center immediate score
 - after goal: ball midfield + pucks reset to start layout
 - end of turn: eject pucks whose centers remain in a goal pocket
-- timer
-- first-to-3
-- timer expiration
-- draw
-- match-end state
+- per-turn move clock (~20s → skip turn)
+- first-to-3 win
+- soft rematch / match-end state
 
 Two people should be able to play a complete match on one computer.
 
@@ -1267,7 +1248,7 @@ TURN_RESOLVED
         ↓
 ...
         ↓
-3 goals OR timer expires
+First to 3
         ↓
 Match ends
 ```
@@ -1297,7 +1278,9 @@ Test:
 - leaving before match
 - disconnecting during match
 - own goal scoring
-- midfield ball reset after goal
+- after goal: ball midfield + pucks reset to start layout
+- end of turn: eject pucks from goal pockets
+- turn timer skip
 
 The server must reject invalid actions safely.
 
@@ -1359,8 +1342,8 @@ Ask:
 - Are goals too difficult?
 - Is the arena the right size?
 - Are goals the right size?
-- Is the timer long enough?
-- Does persistent board state create interesting strategy?
+- Is the turn timer (~20s) long enough?
+- Does resetting pucks after goals keep goals readable without killing mid-match tactics?
 - Is it obvious whose turn it is?
 - Does the defense-oriented start feel right?
 - Does the opponent wait for `TURN_RESOLVED` feel acceptable?
@@ -1398,10 +1381,10 @@ Write unit tests for:
 - reusable pucks
 - scoring
 - own goals
-- midfield ball reset after goal
+- after goal: ball midfield + pucks reset to start layout
+- end of turn: eject pucks from goal pockets
 - first-to-3
-- timer expiration
-- draw
+- turn timer skip
 - invalid actions
 - match completion
 - 5 pucks per player / defense starting layout spawn
@@ -1531,9 +1514,12 @@ Always follow these rules:
 19. Do not send physics state every frame over the network.
 20. The server owns the official match state.
 21. Own goals award the opponent +1.
-22. Shooter uses optimistic local animation; opponent waits for `TURN_RESOLVED` in MVP.
-23. Build thin first — do not over-scaffold monorepo/server/engine before the flick feels good.
-24. Client Matter.js is visual only; server Matter.js is truth.
+22. After a goal: ball → midfield and **pucks reset** to the defense start layout.
+23. Goal when ball **center** enters the pocket (immediate); eject resting pucks from pockets at end of turn.
+24. First to 3 wins; per-turn clock skips the turn (no match-duration clock in MVP).
+25. Shooter uses optimistic local animation; opponent waits for `TURN_RESOLVED` in MVP.
+26. Build thin first — do not over-scaffold monorepo/server/engine before the flick feels good.
+27. Client Matter.js is visual only; server Matter.js is truth.
 
 ---
 

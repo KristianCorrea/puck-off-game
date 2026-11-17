@@ -147,7 +147,7 @@ Minimal join UI is OK (hardcoded inputs / debug panel). Pretty menus are Phase 7
 - [ ] Opponent sees update after `TURN_RESOLVED`
 - [ ] Both end turn with same score/positions
 - [ ] Invalid flick (wrong turn / opponent puck) rejected safely
-- [ ] Goal / own-goal / midfield reset agree on both clients
+- [ ] Goal / own-goal / midfield ball + puck reset agree on both clients
 
 ---
 

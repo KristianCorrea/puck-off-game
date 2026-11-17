@@ -75,7 +75,8 @@ Keep disconnect/abandon behavior **isolated** so policy can change later.
 ### Rules still correct under stress
 
 - [ ] Own goal scoring
-- [ ] Midfield ball reset after goal
+- [ ] After goal: ball midfield + pucks reset to start layout
+- [ ] Turn timer skip under latency
 - [ ] Rejected shot restores shooter local state
 
 ---

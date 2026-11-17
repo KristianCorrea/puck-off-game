@@ -4,7 +4,7 @@ Bootstrapping notes for humans and coding agents working in this repo.
 
 ## What this project is
 
-**Puck Off** is a browser-based **1v1 turn-based physics soccer** game. Players flick permanent pucks into a ball and try to score into the opponent’s goal. First to **3** wins (or higher score when the timer ends).
+**Puck Off** is a browser-based **1v1 turn-based physics soccer** game. Players flick permanent pucks into a ball and try to score into the opponent’s goal. **First to 3** wins. Each turn has a **~20s** move clock; expiry skips the turn.
 
 ## Read these first
 
@@ -18,6 +18,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - **Thin first:** prove the flick (Phase 0–1) before full monorepo / server / engine.
 - **Do not** invent economy, accounts, matchmaking, cosmetics, or formation pickers for MVP.
 - If something is ambiguous, choose the simplest option that preserves core play and isolate it (config / small function).
+- Phase 2 local match is in the client; next formal build step is Phase 3 (`game-engine` / `shared`).
 
 ## Locked MVP decisions (quick)
 
@@ -26,7 +27,11 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 | Pucks | 5 per player, reusable |
 | Start layout | Defense-oriented |
 | Own goal | Opponent +1 |
-| Ball after goal | Midfield; **pucks reset** to start layout |
+| After goal | Ball → midfield; **pucks reset** to start layout |
+| Goal detect | Ball **center** enters pocket → score immediately |
+| Pucks in pocket | Eject onto pitch at end of turn |
+| Win | First to **3** (no match-duration clock) |
+| Turn timer | ~20s; expiry **skips** turn |
 | Net feel | Shooter: optimistic local anim; opponent: wait for `TURN_RESOLVED` |
 | Authority | Server Matter.js = truth; client Matter.js = visual only |
 
@@ -54,9 +59,10 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - After goals: ball → midfield and pucks reset to start layout via `handleGoal()`.
 - Goal when the **ball center** enters the pocket (immediate; don’t wait for settle).
 - Pucks may not rest inside a goal — eject them onto the pitch at end of turn.
+- Prefer soft rematch (reset match state) over tearing down the Matter scene when possible.
 
 ## First milestone
 
 > Can I flick a puck at a ball and does the collision feel satisfying?
 
-**Phase 2 local match is in the client.** Run `npm run dev` for hot-seat play (5v5 pucks, turns, score, timer). Tune physics in `prototypeConfig.ts`, match rules in `gameConfig.ts`.
+**Phase 2 local match is in the client.** Run `npm run dev` for hot-seat play (5v5 pucks, turns, score, turn timer). Tune physics in `prototypeConfig.ts`, match rules in `gameConfig.ts`.
