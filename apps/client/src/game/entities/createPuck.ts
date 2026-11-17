@@ -6,6 +6,8 @@ import { MATCH_CONFIG } from "../config/gameConfig";
 export type PuckEntity = {
   id: string;
   ownerId: PlayerId;
+  spawnX: number;
+  spawnY: number;
   sprite: Phaser.GameObjects.Arc;
   body: MatterJS.BodyType;
 };
@@ -38,9 +40,22 @@ export function createPuckAt(
   return {
     id: opts.id,
     ownerId: opts.ownerId,
+    spawnX: opts.x,
+    spawnY: opts.y,
     sprite,
     body,
   };
+}
+
+export function resetPuckToSpawn(
+  scene: Phaser.Scene,
+  puck: PuckEntity,
+): void {
+  const body = puck.body;
+  body.isSleeping = false;
+  scene.matter.body.setPosition(body, { x: puck.spawnX, y: puck.spawnY });
+  scene.matter.body.setVelocity(body, { x: 0, y: 0 });
+  scene.matter.body.setAngularVelocity(body, 0);
 }
 
 /** Apply a normalized shot. angle is radians; power is 0..1. */

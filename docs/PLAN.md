@@ -22,7 +22,9 @@ These decisions are locked for the MVP unless explicitly changed later:
 | Custom formations | Future feature — not MVP |
 | Own goal | Ball in your own goal → **opponent scores +1** |
 | Ball after goal | Reset to **midfield** (center of the arena) |
-| Arena after goal | **Pucks stay**; board does not reset |
+| Arena after goal | **Pucks reset** to defense starting layout; ball midfield |
+| Goal detection | **Ball center** enters goal pocket → score **immediately** (no settle wait) |
+| Pucks in goal | At end of turn, any puck center still in a pocket is **ejected** onto the pitch |
 | Physics feel (shooter) | **Optimistic local animation** on release — snappy, immediate |
 | Physics sync (opponent) | **Wait for `TURN_RESOLVED`** — no `LAUNCH_CONFIRMED` required for MVP |
 | Authority | Server Matter.js is truth; client Matter.js is visual playback only |
@@ -332,32 +334,22 @@ After any goal, the match immediately checks whether either player has reached 3
 
 ---
 
-# 10. IMPORTANT: ARENA DOES NOT RESET
+# 10. AFTER A GOAL
 
-After a goal:
-
-- Pucks remain where they are.
-- Used pucks remain in the arena.
-- Puck positions are preserved.
-- The board is NOT recreated.
-- Players do NOT get new/reset positions.
-
-The goal should not wipe the current strategic state of the arena.
-
-The exact handling of the ball after a goal should be isolated in a function such as:
+After a goal, isolate handling in:
 
 ```ts
 handleGoal()
 ```
 
-This allows the ball reset/reposition behavior to be tuned later without changing the rest of the game engine.
+**Locked behavior:**
 
-**Locked initial behavior:**
+- Reposition the ball to **midfield** and clear ball velocity.
+- **Reset all pucks** to the defense starting layout (clear velocities).
+- Score using **ball center** in the goal pocket; award as soon as the center enters (do not wait for physics settle).
+- Own goals still award the opponent +1.
 
-- Preserve the arena.
-- Preserve all puck positions.
-- Reposition the ball to **midfield** (center of the arena).
-- Clear ball velocity.
+At the **end of a turn** with no goal: if any puck **center** is still inside a goal pocket, **eject** that puck onto the pitch just outside the mouth.
 
 ---
 
@@ -1186,9 +1178,9 @@ Implement:
 - reusable pucks
 - alternating turns
 - score
-- goals + own goals (opponent +1)
-- persistent arena (pucks stay)
-- ball reset to midfield after goals
+- goals + own goals (opponent +1); ball-center immediate score
+- after goal: ball midfield + pucks reset to start layout
+- end of turn: eject pucks whose centers remain in a goal pocket
 - timer
 - first-to-3
 - timer expiration
@@ -1523,7 +1515,7 @@ Always follow these rules:
 3. Do not make clients authoritative.
 4. Do not put game rules inside React components.
 5. Do not use React state for continuous physics positions.
-6. Do not reset the arena after goals — pucks stay; ball returns to midfield.
+6. After goals: ball returns to midfield and pucks reset to the defense starting layout.
 7. Each player has exactly 5 reusable pucks throughout the match.
 8. Never allow a player to act while physics is resolving.
 9. Never allow a player to control an opponent's puck.

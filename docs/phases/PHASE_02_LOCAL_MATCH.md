@@ -35,7 +35,9 @@ Two people should finish a real game: turns, goals, timer, win/draw — no netwo
 | Pucks | Exactly 5 each; reusable; no ammo |
 | Start | Defense-oriented, symmetric halves; ball midfield |
 | Own goal | Ball in your goal → opponent +1 |
-| After goal | Pucks stay; ball to midfield; clear ball velocity |
+| After goal | Pucks reset to start layout; ball to midfield; clear velocities |
+| Goal timing | Ball **center** in pocket → score immediately (no settle wait) |
+| Pucks in pocket | At end of turn, eject puck centers out onto the pitch |
 | Win | First to 3 ends immediately |
 | Timer | Expiry → higher score wins; tie → draw |
 

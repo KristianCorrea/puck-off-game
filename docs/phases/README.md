@@ -41,6 +41,8 @@ Canonical game rules and architecture live in [`docs/PLAN.md`](../PLAN.md). Agen
 - 5 pucks per player, reusable
 - Defense-oriented starting layout
 - Own goal → opponent +1
-- Ball reset → midfield; pucks stay
+- Ball reset → midfield; pucks reset to start layout
+- Goal on ball center entering pocket (immediate)
+- Pucks ejected from goal pockets at end of turn
 - Shooter: optimistic local anim; opponent: wait for `TURN_RESOLVED`
 - Server Matter.js = truth; client Matter.js = feel

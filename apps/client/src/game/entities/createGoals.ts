@@ -253,19 +253,23 @@ function drawGoalVisuals(
   }
 }
 
+/**
+ * Goal if the body's **center** is inside a goal sensor (not the full circle).
+ */
 export function ballInGoalSide(
   ball: MatterJS.BodyType,
   goals: GoalSensors,
 ): GoalSide | null {
-  const bx = ball.position.x;
-  const by = ball.position.y;
+  return pointInGoalSide(ball.position.x, ball.position.y, goals);
+}
 
-  if (pointInBodyBounds(bx, by, goals.player1)) {
-    return "player1";
-  }
-  if (pointInBodyBounds(bx, by, goals.player2)) {
-    return "player2";
-  }
+export function pointInGoalSide(
+  x: number,
+  y: number,
+  goals: GoalSensors,
+): GoalSide | null {
+  if (pointInBodyBounds(x, y, goals.player1)) return "player1";
+  if (pointInBodyBounds(x, y, goals.player2)) return "player2";
   return null;
 }
 

@@ -9,9 +9,13 @@ import { PROTOTYPE_CONFIG, getFieldBounds } from "../config/prototypeConfig";
 import type { BallEntity } from "../entities/createBall";
 import {
   ballInGoalSide,
+  pointInGoalSide,
   type GoalSensors,
 } from "../entities/createGoals";
-import type { PuckEntity } from "../entities/createPuck";
+import {
+  resetPuckToSpawn,
+  type PuckEntity,
+} from "../entities/createPuck";
 import { FlickController } from "../input/FlickController";
 import { MatchHud, highlightActivePucks } from "./MatchHud";
 import { MatchTimer } from "./MatchTimer";
@@ -94,6 +98,13 @@ export class MatchController {
   }
 
   private updatePhysicsResolution(deltaMs: number): void {
+    // Goal as soon as ball *center* enters a pocket — do not wait for settle.
+    const scoredSide = ballInGoalSide(this.ball.body, this.goals);
+    if (scoredSide) {
+      this.handleGoal(scoredSide);
+      return;
+    }
+
     this.settleElapsedMs += deltaMs;
 
     if (this.bodiesSettled()) {
@@ -108,11 +119,8 @@ export class MatchController {
 
     if (!settled) return;
 
-    const side = ballInGoalSide(this.ball.body, this.goals);
-    if (side) {
-      this.handleGoal(side);
-      return;
-    }
+    // Pucks may not rest inside a goal — push them back onto the pitch.
+    this.ejectPucksFromGoals();
 
     this.turns.advance();
     this.phase = "PLAYER_TURN";
@@ -124,18 +132,16 @@ export class MatchController {
     this.flick.setEnabled(false);
     this.score.awardForGoalIn(goalSide);
     this.resetBallMidfield();
+    this.resetAllPucksToSpawn();
     this.goalPauseMs = 900;
 
     const winner = this.score.hasWinner();
     if (winner) {
       this.result = winner;
-      // Still show brief Goal! then end
     }
   }
 
-  /**
-   * Isolated ball reset after a goal — pucks stay where they are.
-   */
+  /** Ball → midfield after a goal. */
   private resetBallMidfield(): void {
     const field = getFieldBounds();
     const matter = this.scene.matter;
@@ -144,6 +150,46 @@ export class MatchController {
     matter.body.setPosition(body, { x: field.centerX, y: field.centerY });
     matter.body.setVelocity(body, { x: 0, y: 0 });
     matter.body.setAngularVelocity(body, 0);
+  }
+
+  /** After a goal, all pucks return to the defense starting layout. */
+  private resetAllPucksToSpawn(): void {
+    for (const puck of this.pucks) {
+      resetPuckToSpawn(this.scene, puck);
+    }
+  }
+
+  /**
+   * If a puck center is inside a goal pocket at end of turn, place it
+   * just onto the pitch outside that mouth.
+   */
+  private ejectPucksFromGoals(): void {
+    const field = getFieldBounds();
+    const { wallThickness } = PROTOTYPE_CONFIG.arena;
+    const margin = PROTOTYPE_CONFIG.puck.radius + 10;
+    const matter = this.scene.matter;
+    const minY = wallThickness + margin;
+    const maxY = PROTOTYPE_CONFIG.arena.height - wallThickness - margin;
+
+    for (const puck of this.pucks) {
+      const side = pointInGoalSide(
+        puck.body.position.x,
+        puck.body.position.y,
+        this.goals,
+      );
+      if (!side) continue;
+
+      const x =
+        side === "player1"
+          ? field.left + wallThickness + margin
+          : field.right - wallThickness - margin;
+      const y = Math.min(maxY, Math.max(minY, puck.body.position.y));
+
+      puck.body.isSleeping = false;
+      matter.body.setPosition(puck.body, { x, y });
+      matter.body.setVelocity(puck.body, { x: 0, y: 0 });
+      matter.body.setAngularVelocity(puck.body, 0);
+    }
   }
 
   private updateGoalResolution(deltaMs: number): void {
@@ -164,6 +210,7 @@ export class MatchController {
 
   private endOnTimer(): void {
     this.flick.setEnabled(false);
+    this.ejectPucksFromGoals();
     const outcome = this.score.winnerOnTimerExpiry();
     this.result = outcome === "draw" ? "draw" : outcome;
     this.phase = "MATCH_END";

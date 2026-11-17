@@ -26,7 +26,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 | Pucks | 5 per player, reusable |
 | Start layout | Defense-oriented |
 | Own goal | Opponent +1 |
-| Ball after goal | Midfield; pucks stay |
+| Ball after goal | Midfield; **pucks reset** to start layout |
 | Net feel | Shooter: optimistic local anim; opponent: wait for `TURN_RESOLVED` |
 | Authority | Server Matter.js = truth; client Matter.js = visual only |
 
@@ -51,7 +51,9 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - Don’t put continuous physics positions in React state.
 - Clients send **intent** (`LAUNCH_PUCK`); never trust client score/winner/timer/physics results.
 - Don’t send physics every frame over the network.
-- Don’t reset the arena after goals (pucks persist; ball → midfield via `handleGoal()`).
+- After goals: ball → midfield and pucks reset to start layout via `handleGoal()`.
+- Goal when the **ball center** enters the pocket (immediate; don’t wait for settle).
+- Pucks may not rest inside a goal — eject them onto the pitch at end of turn.
 
 ## First milestone
 
