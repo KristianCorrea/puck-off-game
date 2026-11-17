@@ -64,8 +64,9 @@ export class MatchHud {
     timer: MatchTimer;
     phase: MatchPhase;
     result: MatchResult;
+    selectedPuckId?: string | null;
   }): void {
-    const { score, turn, timer, phase, result } = opts;
+    const { score, turn, timer, phase, result, selectedPuckId = null } = opts;
     this.scoreText.setText(
       `P1  ${score.player1} - ${score.player2}  P2`,
     );
@@ -95,7 +96,11 @@ export class MatchHud {
 
     const p = MATCH_CONFIG.players[turn.current];
     this.turnText.setColor(phaserColorToCss(p.color));
-    this.turnText.setText(`${p.label} — your turn`);
+    this.turnText.setText(
+      selectedPuckId
+        ? `${p.label} — drag anywhere to flick`
+        : `${p.label} — your turn (tap puck for remote aim)`,
+    );
   }
 
   private showResult(result: MatchResult): void {
@@ -112,13 +117,26 @@ function phaserColorToCss(color: number): string {
 }
 
 export function highlightActivePucks(
-  pucks: { ownerId: PlayerId; sprite: Phaser.GameObjects.Arc }[],
+  pucks: {
+    id: string;
+    ownerId: PlayerId;
+    sprite: Phaser.GameObjects.Arc;
+  }[],
   current: PlayerId,
   phase: MatchPhase,
+  selectedPuckId: string | null = null,
 ): void {
   const active = phase === "PLAYER_TURN";
   for (const puck of pucks) {
     const mine = puck.ownerId === current;
+    const selected = selectedPuckId === puck.id;
     puck.sprite.setAlpha(active && mine ? 1 : active ? 0.45 : 0.7);
+
+    const stroke = MATCH_CONFIG.players[puck.ownerId].strokeColor;
+    if (selected && active) {
+      puck.sprite.setStrokeStyle(5, 0xffe066);
+    } else {
+      puck.sprite.setStrokeStyle(3, stroke);
+    }
   }
 }

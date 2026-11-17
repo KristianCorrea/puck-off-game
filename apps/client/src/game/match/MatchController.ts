@@ -249,7 +249,13 @@ export class MatchController {
       timer: this.timer,
       phase: this.phase,
       result: this.result,
+      selectedPuckId: this.flick.selectedPuckId,
     });
-    highlightActivePucks(this.pucks, this.turns.current, this.phase);
+    highlightActivePucks(
+      this.pucks,
+      this.turns.current,
+      this.phase,
+      this.flick.selectedPuckId,
+    );
   }
 }
