@@ -16,11 +16,13 @@ const { width, height } = PROTOTYPE_CONFIG.arena;
 new Phaser.Game({
   type: Phaser.AUTO,
   parent,
-  backgroundColor: "#0b1220",
+  backgroundColor: "#050b12",
   width,
   height,
   scale: {
-    mode: Phaser.Scale.FIT,
+    // Canvas fills the phone; ArenaScene letterboxes the fixed world via camera zoom.
+    // That keeps FIT-style bars *inside* the canvas so flicks track over them.
+    mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width,
     height,
@@ -28,7 +30,6 @@ new Phaser.Game({
     autoRound: true,
   },
   input: {
-    // Multi-touch headroom; flick still tracks a single pointer id.
     activePointers: 3,
   },
   render: {

@@ -1,5 +1,9 @@
 import Phaser from "phaser";
-import { getFieldBounds, u } from "../config/prototypeConfig";
+import {
+  PROTOTYPE_CONFIG,
+  getFieldBounds,
+  u,
+} from "../config/prototypeConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
 
 const PARTICLE_KEY = "goal_party_particle";
@@ -31,12 +35,11 @@ export class GoalCelebration {
     ensureParticleTexture(scene);
 
     const field = getFieldBounds();
-    const { width, height } = scene.scale;
+    const { width, height } = PROTOTYPE_CONFIG.arena;
 
     this.flash = scene.add
       .rectangle(width / 2, height / 2, width * 2, height * 2, 0xfff5c2, 0)
-      .setDepth(48)
-      .setScrollFactor(0);
+      .setDepth(48);
 
     this.glowText = scene.add
       .text(field.centerX, field.centerY - u(24), "GOAL!!!", {
@@ -49,7 +52,6 @@ export class GoalCelebration {
       })
       .setOrigin(0.5)
       .setDepth(49)
-      .setScrollFactor(0)
       .setAlpha(0)
       .setVisible(false);
 
@@ -72,7 +74,6 @@ export class GoalCelebration {
       })
       .setOrigin(0.5)
       .setDepth(50)
-      .setScrollFactor(0)
       .setAlpha(0)
       .setVisible(false);
   }
@@ -235,8 +236,7 @@ export class GoalCelebration {
           ),
         })
         .setOrigin(0.5)
-        .setDepth(52)
-        .setScrollFactor(0);
+        .setDepth(52);
 
       const angle = Phaser.Math.DegToRad(-160 + i * 40 + Phaser.Math.Between(-10, 10));
       const dist = Phaser.Math.Between(u(160), u(280));

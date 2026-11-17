@@ -7,6 +7,7 @@ import { createWalls } from "./entities/createWalls";
 import { drawPitchMarkings } from "./entities/drawPitch";
 import { getDefenseLayout } from "./match/layouts/defenseLayout";
 import { MatchController } from "./match/MatchController";
+import { bindLetterboxCamera } from "./scale/letterboxCamera";
 import { enterPlayMode } from "../mobile/playShell";
 
 /**
@@ -22,9 +23,9 @@ export class ArenaScene extends Phaser.Scene {
 
   create(): void {
     this.restartQueued = false;
-    const { width, height, backgroundColor, hudHeight } = PROTOTYPE_CONFIG.arena;
+    const { width, height, hudHeight } = PROTOTYPE_CONFIG.arena;
 
-    this.cameras.main.setBackgroundColor(backgroundColor);
+    bindLetterboxCamera(this);
     this.matter.world.setBounds(0, 0, width, height, 0, false, false, false, false);
     this.matter.world.disableGravity();
 

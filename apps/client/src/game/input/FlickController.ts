@@ -3,8 +3,8 @@ import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
 import { applyImpulse, type PuckEntity } from "../entities/createPuck";
 import { AimIndicator } from "../ui/AimIndicator";
 
-/** Pointer travel below this on release counts as a tap (select), not a flick. */
-const TAP_MAX_MOVE_PX = u(10);
+/** World-space travel below this on release counts as a tap (select), not a flick. */
+const TAP_MAX_MOVE_WORLD = u(10);
 
 type DragState = {
   active: boolean;
@@ -24,8 +24,8 @@ type DragState = {
 type PendingPress = {
   pointerId: number;
   puck: PuckEntity;
-  startX: number;
-  startY: number;
+  startWorldX: number;
+  startWorldY: number;
 };
 
 export type FlickControllerOptions = {
@@ -52,6 +52,9 @@ type PuckHandler = (
  * Multi-puck slingshot:
  * - Drag on a puck → normal flick
  * - Tap a puck → select it; then drag anywhere to flick (tight spaces)
+ *
+ * Letterbox bars are on-canvas (camera letterbox + Scale.RESIZE), so normal
+ * Phaser pointer events keep tracking there. Document listeners are a backup.
  */
 export class FlickController {
   private readonly scene: Phaser.Scene;
@@ -70,6 +73,7 @@ export class FlickController {
   private enabled = true;
   private readonly handlers = new Map<string, PuckHandler>();
   private boundPucks: PuckEntity[] = [];
+  private domTracking = false;
 
   constructor(scene: Phaser.Scene, opts: FlickControllerOptions) {
     this.scene = scene;
@@ -79,7 +83,6 @@ export class FlickController {
     scene.input.on("pointerdown", this.onScenePointerDown, this);
     scene.input.on("pointermove", this.onPointerMove, this);
     scene.input.on("pointerup", this.onPointerUp, this);
-    scene.input.on("pointerupoutside", this.onPointerUp, this);
   }
 
   /** Currently tap-selected puck id, if any. */
@@ -105,15 +108,16 @@ export class FlickController {
       this.cancelDrag();
       this.pending = null;
       this.clearSelection();
+      this.disarmDomTracking();
     }
   }
 
   destroy(): void {
+    this.disarmDomTracking();
     this.unbindPucks();
     this.scene.input.off("pointerdown", this.onScenePointerDown, this);
     this.scene.input.off("pointermove", this.onPointerMove, this);
     this.scene.input.off("pointerup", this.onPointerUp, this);
-    this.scene.input.off("pointerupoutside", this.onPointerUp, this);
     this.aim.destroy();
   }
 
@@ -130,6 +134,62 @@ export class FlickController {
     return this.opts.getSelectablePucks().some((p) => p.id === puck.id);
   }
 
+  private armDomTracking(pointer: Phaser.Input.Pointer): void {
+    const evt = pointer.event as PointerEvent | undefined;
+    const canvas = this.scene.game.canvas;
+    if (evt && typeof evt.pointerId === "number") {
+      try {
+        canvas.setPointerCapture?.(evt.pointerId);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (this.domTracking) return;
+    this.domTracking = true;
+    // Capture phase on document: survives leaving the canvas element entirely.
+    document.addEventListener("pointermove", this.onDomPointerMove, true);
+    document.addEventListener("pointerup", this.onDomPointerUp, true);
+    document.addEventListener("pointercancel", this.onDomPointerCancel, true);
+    document.addEventListener("touchmove", this.onDomTouchMove, {
+      capture: true,
+      passive: false,
+    });
+    document.addEventListener("touchend", this.onDomTouchEnd, true);
+    document.addEventListener("touchcancel", this.onDomTouchCancel, true);
+  }
+
+  private disarmDomTracking(): void {
+    if (!this.domTracking) return;
+    this.domTracking = false;
+    document.removeEventListener("pointermove", this.onDomPointerMove, true);
+    document.removeEventListener("pointerup", this.onDomPointerUp, true);
+    document.removeEventListener("pointercancel", this.onDomPointerCancel, true);
+    document.removeEventListener("touchmove", this.onDomTouchMove, true);
+    document.removeEventListener("touchend", this.onDomTouchEnd, true);
+    document.removeEventListener("touchcancel", this.onDomTouchCancel, true);
+  }
+
+  /** Map viewport client coords → world via canvas bounds + camera. */
+  private clientToWorld(
+    clientX: number,
+    clientY: number,
+  ): { x: number; y: number } {
+    const canvas = this.scene.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const gameX =
+      ((clientX - rect.left) / Math.max(rect.width, 1)) *
+      this.scene.scale.width;
+    const gameY =
+      ((clientY - rect.top) / Math.max(rect.height, 1)) *
+      this.scene.scale.height;
+    return this.scene.cameras.main.getWorldPoint(gameX, gameY);
+  }
+
+  private pointerWorld(pointer: Phaser.Input.Pointer): { x: number; y: number } {
+    return this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
+  }
+
   private beginPuckPress(
     puck: PuckEntity,
     pointer: Phaser.Input.Pointer,
@@ -139,18 +199,18 @@ export class FlickController {
     if (!this.isSelectable(puck)) return;
 
     event.stopPropagation();
+    const world = this.pointerWorld(pointer);
     this.pending = {
       pointerId: pointer.id,
       puck,
-      startX: pointer.x,
-      startY: pointer.y,
+      startWorldX: world.x,
+      startWorldY: world.y,
     };
+    this.armDomTracking(pointer);
   }
 
-  /** Drag-anywhere when a puck is already selected; empty tap clears selection. */
   private onScenePointerDown(pointer: Phaser.Input.Pointer): void {
     if (!this.enabled || this.drag.active) return;
-    // Puck press owns this pointer (handler may run before or after this).
     if (this.pending && this.pending.pointerId === pointer.id) return;
     if (this.pointerHitsSelectablePuck(pointer)) return;
 
@@ -170,27 +230,88 @@ export class FlickController {
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
-    if (this.pending && pointer.id === this.pending.pointerId) {
-      const dx = pointer.x - this.pending.startX;
-      const dy = pointer.y - this.pending.startY;
-      if (Math.hypot(dx, dy) >= TAP_MAX_MOVE_PX) {
+    if (!this.gestureOwns(pointer.id)) return;
+    this.handleMoveWorld(this.pointerWorld(pointer));
+  }
+
+  private onPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (!this.gestureOwns(pointer.id)) return;
+    this.handleUpWorld(this.pointerWorld(pointer));
+  }
+
+  private onDomPointerMove = (event: PointerEvent): void => {
+    if (!this.hasGesture()) return;
+    this.handleMoveWorld(this.clientToWorld(event.clientX, event.clientY));
+  };
+
+  private onDomPointerUp = (event: PointerEvent): void => {
+    if (!this.hasGesture()) return;
+    this.handleUpWorld(this.clientToWorld(event.clientX, event.clientY));
+  };
+
+  private onDomPointerCancel = (): void => {
+    if (!this.hasGesture()) return;
+    this.pending = null;
+    this.cancelDrag();
+    this.disarmDomTracking();
+  };
+
+  private onDomTouchMove = (event: TouchEvent): void => {
+    if (!this.hasGesture() || event.touches.length === 0) return;
+    event.preventDefault();
+    const t = event.touches[0]!;
+    this.handleMoveWorld(this.clientToWorld(t.clientX, t.clientY));
+  };
+
+  private onDomTouchEnd = (event: TouchEvent): void => {
+    if (!this.hasGesture()) return;
+    const t = event.changedTouches[0];
+    if (!t) return;
+    this.handleUpWorld(this.clientToWorld(t.clientX, t.clientY));
+  };
+
+  private onDomTouchCancel = (): void => {
+    this.onDomPointerCancel();
+  };
+
+  private hasGesture(): boolean {
+    return this.drag.active || this.pending !== null;
+  }
+
+  private gestureOwns(pointerId: number): boolean {
+    if (this.drag.active) return pointerId === this.drag.pointerId;
+    if (this.pending) return pointerId === this.pending.pointerId;
+    return false;
+  }
+
+  private handleMoveWorld(world: { x: number; y: number }): void {
+    if (this.pending) {
+      const dx = world.x - this.pending.startWorldX;
+      const dy = world.y - this.pending.startWorldY;
+      if (Math.hypot(dx, dy) >= TAP_MAX_MOVE_WORLD) {
         const puck = this.pending.puck;
+        const pointerId = this.pending.pointerId;
         this.pending = null;
-        // On-puck drag: classic slingshot anchored at the puck.
-        this.beginDrag(puck, pointer, /* relativeToGesture */ false);
+        this.beginDragAt(
+          puck,
+          pointerId,
+          world.x,
+          world.y,
+          /* relativeToGesture */ false,
+        );
       }
       return;
     }
 
-    if (!this.drag.active || pointer.id !== this.drag.pointerId) return;
-    this.updateAim(pointer);
+    if (!this.drag.active) return;
+    this.updateAimWorld(world.x, world.y);
   }
 
-  private onPointerUp(pointer: Phaser.Input.Pointer): void {
-    if (this.pending && pointer.id === this.pending.pointerId) {
+  private handleUpWorld(world: { x: number; y: number }): void {
+    if (this.pending) {
       const puck = this.pending.puck;
       this.pending = null;
-      // Tap: toggle selection on same puck, otherwise select.
+      this.disarmDomTracking();
       if (this.selected?.id === puck.id) {
         this.clearSelection();
       } else {
@@ -199,14 +320,14 @@ export class FlickController {
       return;
     }
 
-    if (!this.drag.active || pointer.id !== this.drag.pointerId) return;
+    if (!this.drag.active) return;
 
     const puck = this.drag.puck;
-    const shot = puck ? this.computeShot(pointer, puck) : null;
+    const shot = puck ? this.computeShotWorld(world.x, world.y, puck) : null;
     this.cancelDrag();
+    this.disarmDomTracking();
 
     if (!puck || !shot) {
-      // Click-anywhere with no pull while selected → deselect.
       if (this.selected) this.clearSelection();
       return;
     }
@@ -222,14 +343,31 @@ export class FlickController {
     pointer: Phaser.Input.Pointer,
     relativeToGesture: boolean,
   ): void {
+    this.armDomTracking(pointer);
     const world = this.pointerWorld(pointer);
+    this.beginDragAt(
+      puck,
+      pointer.id,
+      world.x,
+      world.y,
+      relativeToGesture,
+    );
+  }
+
+  private beginDragAt(
+    puck: PuckEntity,
+    pointerId: number,
+    worldX: number,
+    worldY: number,
+    relativeToGesture: boolean,
+  ): void {
     this.drag.active = true;
-    this.drag.pointerId = pointer.id;
+    this.drag.pointerId = pointerId;
     this.drag.puck = puck;
-    this.drag.originX = world.x;
-    this.drag.originY = world.y;
+    this.drag.originX = worldX;
+    this.drag.originY = worldY;
     this.drag.relativeToGesture = relativeToGesture;
-    this.updateAim(pointer);
+    this.updateAimWorld(worldX, worldY);
   }
 
   private cancelDrag(): void {
@@ -244,10 +382,10 @@ export class FlickController {
     this.selected = null;
   }
 
-  private updateAim(pointer: Phaser.Input.Pointer): void {
+  private updateAimWorld(worldX: number, worldY: number): void {
     const puck = this.drag.puck;
     if (!puck) return;
-    const shot = this.computeShot(pointer, puck);
+    const shot = this.computeShotWorld(worldX, worldY, puck);
     if (!shot) {
       this.aim.hide();
       this.opts.onAimEnd?.();
@@ -258,30 +396,24 @@ export class FlickController {
     this.opts.onAim?.(puck, shot);
   }
 
-  private pointerWorld(pointer: Phaser.Input.Pointer): { x: number; y: number } {
-    return this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y);
-  }
-
-  private computeShot(
-    pointer: Phaser.Input.Pointer,
+  private computeShotWorld(
+    worldX: number,
+    worldY: number,
     puck: PuckEntity,
   ): { angle: number; power: number } | null {
-    const world = this.pointerWorld(pointer);
     let dragX: number;
     let dragY: number;
 
     if (this.drag.relativeToGesture) {
-      // Remote: direction/power from the click-drag gesture itself.
-      dragX = world.x - this.drag.originX;
-      dragY = world.y - this.drag.originY;
+      dragX = worldX - this.drag.originX;
+      dragY = worldY - this.drag.originY;
     } else {
-      // Classic: pull away from the puck.
-      dragX = world.x - puck.body.position.x;
-      dragY = world.y - puck.body.position.y;
+      dragX = worldX - puck.body.position.x;
+      dragY = worldY - puck.body.position.y;
     }
 
     const dist = Math.hypot(dragX, dragY);
-    if (dist < 6) return null;
+    if (dist < u(6)) return null;
 
     const power = Math.min(1, dist / PROTOTYPE_CONFIG.shot.maxDragPx);
     const angle = Math.atan2(-dragY, -dragX);

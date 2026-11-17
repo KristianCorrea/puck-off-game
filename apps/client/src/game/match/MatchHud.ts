@@ -40,7 +40,8 @@ export class MatchHud {
     const { width, hudHeight } = PROTOTYPE_CONFIG.arena;
     const field = getFieldBounds();
 
-    this.panel = scene.add.graphics().setDepth(40).setScrollFactor(0);
+    // World-space HUD (scrolls/zooms with letterboxed camera — bars stay on-canvas).
+    this.panel = scene.add.graphics().setDepth(40);
     this.panel.fillStyle(0x0b1a28, 0.98);
     this.panel.fillRect(0, 0, width, hudHeight);
     this.panel.fillStyle(0x134e4a, 1);
@@ -58,8 +59,7 @@ export class MatchHud {
         letterSpacing: u(2),
       })
       .setOrigin(0, 0)
-      .setDepth(41)
-      .setScrollFactor(0);
+      .setDepth(41);
 
     this.metaText = scene.add
       .text(
@@ -74,8 +74,7 @@ export class MatchHud {
         },
       )
       .setOrigin(0, 0)
-      .setDepth(41)
-      .setScrollFactor(0);
+      .setDepth(41);
 
     this.scoreText = scene.add
       .text(field.centerX, u(10), "0  —  0", {
@@ -84,10 +83,9 @@ export class MatchHud {
         color: "#f8fafc",
       })
       .setOrigin(0.5, 0)
-      .setDepth(41)
-      .setScrollFactor(0);
+      .setDepth(41);
 
-    this.timerPill = scene.add.graphics().setDepth(41).setScrollFactor(0);
+    this.timerPill = scene.add.graphics().setDepth(41);
     this.timerText = scene.add
       .text(field.centerX, u(68), "20s", {
         fontFamily: FONT,
@@ -96,8 +94,7 @@ export class MatchHud {
         fontStyle: "800",
       })
       .setOrigin(0.5)
-      .setDepth(42)
-      .setScrollFactor(0);
+      .setDepth(42);
 
     this.turnText = scene.add
       .text(width - u(28), u(22), "Player 1 — your turn", {
@@ -107,8 +104,7 @@ export class MatchHud {
         fontStyle: "700",
       })
       .setOrigin(1, 0)
-      .setDepth(41)
-      .setScrollFactor(0);
+      .setDepth(41);
 
     const p1 = this.makePlayerChip("player1", field.centerX - u(168), u(58));
     const p2 = this.makePlayerChip("player2", field.centerX + u(168), u(58));
@@ -256,8 +252,7 @@ export class MatchHud {
       .setOrigin(0, 0.5);
     const container = this.scene.add
       .container(x, y, [bg, dot, label])
-      .setDepth(41)
-      .setScrollFactor(0);
+      .setDepth(41);
     return { container, label };
   }
 
