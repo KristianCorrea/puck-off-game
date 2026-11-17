@@ -7,6 +7,7 @@ import { createWalls } from "./entities/createWalls";
 import { drawPitchMarkings } from "./entities/drawPitch";
 import { getDefenseLayout } from "./match/layouts/defenseLayout";
 import { MatchController } from "./match/MatchController";
+import { enterPlayMode } from "../mobile/playShell";
 
 /**
  * Phase 2: full local hot-seat match on one machine.
@@ -81,6 +82,8 @@ export class ArenaScene extends Phaser.Scene {
   private queueRematch(): void {
     if (this.restartQueued) return;
     this.restartQueued = true;
+    // User gesture: re-assert fullscreen / landscape before recreating the scene.
+    void enterPlayMode();
     this.time.delayedCall(0, () => {
       this.scene.restart();
     });

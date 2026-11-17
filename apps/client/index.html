@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#050b12" />
     <title>Puck Off</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -13,25 +20,123 @@
     <style>
       * {
         box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
       }
 
       html,
-      body,
-      #game {
+      body {
         margin: 0;
         width: 100%;
         height: 100%;
+        height: 100dvh;
         overflow: hidden;
         background: radial-gradient(ellipse at top, #10243a 0%, #050b12 55%);
+        touch-action: none;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      #game {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        height: 100dvh;
+        overflow: hidden;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left);
+        touch-action: none;
       }
 
       #game canvas {
         image-rendering: auto;
+        touch-action: none;
+      }
+
+      .shell-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 1.5rem;
+        padding-top: max(1.5rem, env(safe-area-inset-top));
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+        text-align: center;
+        font-family: "Nunito", system-ui, sans-serif;
+        color: #e2e8f0;
+        background: rgba(5, 11, 18, 0.92);
+        touch-action: none;
+      }
+
+      .shell-overlay.is-visible {
+        display: flex;
+      }
+
+      .shell-overlay h1 {
+        margin: 0;
+        font-family: "Teko", "Arial Narrow", Impact, sans-serif;
+        font-size: clamp(2.5rem, 12vw, 4rem);
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        color: #f8fafc;
+      }
+
+      .shell-overlay p {
+        margin: 0;
+        max-width: 18rem;
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.4;
+        color: #94a3b8;
+      }
+
+      .shell-overlay .shell-cta {
+        margin-top: 0.5rem;
+        border: 0;
+        border-radius: 0.35rem;
+        padding: 0.85rem 1.6rem;
+        font: inherit;
+        font-size: 1.05rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: #0f172a;
+        background: #fbbf24;
+        cursor: pointer;
+      }
+
+      .shell-overlay .shell-cta:active {
+        background: #fde68a;
+      }
+
+      #rotate-overlay .shell-icon {
+        font-size: 3rem;
+        line-height: 1;
+        transform: rotate(90deg);
       }
     </style>
   </head>
   <body>
     <div id="game"></div>
+
+    <div id="tap-to-play" class="shell-overlay" role="dialog" aria-modal="true">
+      <h1>PUCK OFF</h1>
+      <p>Landscape play · flick pucks · first to 3</p>
+      <button type="button" class="shell-cta" id="tap-to-play-btn">
+        TAP TO PLAY
+      </button>
+    </div>
+
+    <div id="rotate-overlay" class="shell-overlay" role="status" aria-live="polite">
+      <div class="shell-icon" aria-hidden="true">▭</div>
+      <h1>ROTATE</h1>
+      <p>Turn your phone sideways for the full pitch.</p>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

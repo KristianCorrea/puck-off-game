@@ -1,12 +1,15 @@
 import Phaser from "phaser";
 import { ArenaScene } from "./game/ArenaScene";
 import { PROTOTYPE_CONFIG } from "./game/config/prototypeConfig";
+import { installPlayShell } from "./mobile/playShell";
 
 const parent = document.getElementById("game");
 
 if (!parent) {
   throw new Error("Missing #game container");
 }
+
+installPlayShell();
 
 const { width, height } = PROTOTYPE_CONFIG.arena;
 
@@ -23,6 +26,10 @@ new Phaser.Game({
     height,
     expandParent: true,
     autoRound: true,
+  },
+  input: {
+    // Multi-touch headroom; flick still tracks a single pointer id.
+    activePointers: 3,
   },
   render: {
     antialias: true,

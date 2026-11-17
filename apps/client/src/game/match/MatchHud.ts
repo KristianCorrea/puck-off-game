@@ -135,7 +135,7 @@ export class MatchHud {
         color: "#0f172a",
         backgroundColor: "#fbbf24",
         fontStyle: "800",
-        padding: { x: u(22), y: u(12) },
+        padding: { x: u(28), y: u(16) },
       })
       .setOrigin(0.5)
       .setDepth(51)
