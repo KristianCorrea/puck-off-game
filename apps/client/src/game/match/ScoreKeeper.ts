@@ -17,10 +17,4 @@ export class ScoreKeeper {
     if (this.player2 >= MATCH_CONFIG.maxGoals) return "player2";
     return null;
   }
-
-  winnerOnTimerExpiry(): PlayerId | "draw" {
-    if (this.player1 > this.player2) return "player1";
-    if (this.player2 > this.player1) return "player2";
-    return "draw";
-  }
 }

@@ -3,9 +3,10 @@ import { PROTOTYPE_CONFIG } from "./prototypeConfig";
 /** Match rules for Phase 2 local play (evolves into shared GAME_CONFIG). */
 export const MATCH_CONFIG = {
   pucksPerPlayer: 5,
+  /** First to this many goals wins (no match clock). */
   maxGoals: 3,
-  /** 3 minutes */
-  matchDurationMs: 180_000,
+  /** Per-turn move limit; expire → skip turn */
+  turnDurationMs: 20_000,
   /** Frames all bodies must stay under stopSpeed before settle */
   settleStableFrames: 14,
   /** Safety cap so a turn cannot hang forever */

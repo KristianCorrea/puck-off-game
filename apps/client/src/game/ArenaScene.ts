@@ -60,6 +60,9 @@ export class ArenaScene extends Phaser.Scene {
       pucks,
       ball,
       goals,
+      onRematch: () => {
+        this.scene.restart();
+      },
     });
 
     this.add
@@ -75,7 +78,7 @@ export class ArenaScene extends Phaser.Scene {
       .text(
         field.left + 16,
         height - 16,
-        `First to ${MATCH_CONFIG.maxGoals} · hot-seat`,
+        `First to ${MATCH_CONFIG.maxGoals} · ${MATCH_CONFIG.turnDurationMs / 1000}s / turn`,
         {
           fontFamily: "system-ui, sans-serif",
           fontSize: "12px",

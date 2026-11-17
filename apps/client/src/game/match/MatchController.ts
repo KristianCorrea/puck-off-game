@@ -49,12 +49,13 @@ export class MatchController {
     pucks: PuckEntity[];
     ball: BallEntity;
     goals: GoalSensors;
+    onRematch: () => void;
   }) {
     this.scene = opts.scene;
     this.pucks = opts.pucks;
     this.ball = opts.ball;
     this.goals = opts.goals;
-    this.hud = new MatchHud(opts.scene);
+    this.hud = new MatchHud(opts.scene, { onRematch: opts.onRematch });
 
     this.flick = new FlickController(opts.scene, {
       getSelectablePucks: () =>
@@ -64,20 +65,23 @@ export class MatchController {
       onLaunch: () => this.beginPhysicsResolution(),
     });
     this.flick.bindPucks(this.pucks);
+    this.enterPlayerTurn();
     this.refreshUi();
   }
 
   destroy(): void {
     this.flick.destroy();
+    this.hud.destroy();
   }
 
   update(deltaMs: number): void {
     this.dampenAll();
 
-    // Match clock pauses during goal celebration and match end.
-    if (this.phase === "PLAYER_TURN" || this.phase === "PHYSICS_RESOLUTION") {
+    // Only the active player's move clock runs.
+    if (this.phase === "PLAYER_TURN") {
       if (this.timer.tick(deltaMs)) {
-        this.endOnTimer();
+        this.skipTurnOnTimeout();
+        this.refreshUi();
         return;
       }
     }
@@ -91,8 +95,15 @@ export class MatchController {
     this.refreshUi();
   }
 
+  private enterPlayerTurn(): void {
+    this.phase = "PLAYER_TURN";
+    this.timer.reset();
+    this.flick.setEnabled(true);
+  }
+
   private beginPhysicsResolution(): void {
     this.phase = "PHYSICS_RESOLUTION";
+    this.timer.stop();
     this.flick.setEnabled(false);
     this.stableFrames = 0;
     this.settleElapsedMs = 0;
@@ -124,15 +135,22 @@ export class MatchController {
     this.ejectPucksFromGoals();
 
     this.turns.advance();
-    this.phase = "PLAYER_TURN";
-    this.flick.setEnabled(true);
+    this.enterPlayerTurn();
+  }
+
+  private skipTurnOnTimeout(): void {
+    this.flick.setEnabled(false);
+    this.ejectPucksFromGoals();
+    this.turns.advance();
+    this.enterPlayerTurn();
   }
 
   private handleGoal(goalSide: PlayerId): void {
     this.phase = "GOAL_RESOLUTION";
+    this.timer.stop();
     this.flick.setEnabled(false);
+
     this.score.awardForGoalIn(goalSide);
-    // Let physics keep playing; reset only after celebration.
     this.goalPauseMs = MATCH_CONFIG.goalCelebrationMs;
 
     const winner = this.score.hasWinner();
@@ -202,22 +220,13 @@ export class MatchController {
 
     if (this.result) {
       this.phase = "MATCH_END";
-      this.timer.running = false;
+      this.timer.stop();
       this.flick.setEnabled(false);
       return;
     }
 
     this.turns.advance();
-    this.phase = "PLAYER_TURN";
-    this.flick.setEnabled(true);
-  }
-
-  private endOnTimer(): void {
-    this.flick.setEnabled(false);
-    this.ejectPucksFromGoals();
-    const outcome = this.score.winnerOnTimerExpiry();
-    this.result = outcome === "draw" ? "draw" : outcome;
-    this.phase = "MATCH_END";
+    this.enterPlayerTurn();
   }
 
   private bodiesSettled(): boolean {

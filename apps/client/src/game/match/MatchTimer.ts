@@ -1,12 +1,21 @@
 import { MATCH_CONFIG } from "../config/gameConfig";
 
-/** Countdown timer; only ticks while `running` is true. */
+/** Per-turn move countdown; expires → skip turn. */
 export class MatchTimer {
   remainingMs: number;
   running = true;
 
-  constructor(durationMs = MATCH_CONFIG.matchDurationMs) {
+  constructor(durationMs = MATCH_CONFIG.turnDurationMs) {
     this.remainingMs = durationMs;
+  }
+
+  reset(durationMs = MATCH_CONFIG.turnDurationMs): void {
+    this.remainingMs = durationMs;
+    this.running = true;
+  }
+
+  stop(): void {
+    this.running = false;
   }
 
   /** @returns true if time just expired this tick */
@@ -21,13 +30,15 @@ export class MatchTimer {
   }
 
   format(): string {
-    const totalSec = Math.ceil(this.remainingMs / 1000);
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return `${m}:${s.toString().padStart(2, "0")}`;
+    const totalSec = Math.max(0, Math.ceil(this.remainingMs / 1000));
+    return `${totalSec}s`;
   }
 
   get expired(): boolean {
     return this.remainingMs <= 0;
+  }
+
+  get urgent(): boolean {
+    return this.remainingMs > 0 && this.remainingMs <= 5_000;
   }
 }
