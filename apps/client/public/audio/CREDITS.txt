@@ -1,0 +1,8 @@
+Audio credits
+
+All files in this folder are from Kenney.nl asset packs (CC0 1.0):
+- Impact Sounds — https://kenney.nl/assets/impact-sounds
+- Interface Sounds — https://kenney.nl/assets/interface-sounds
+
+License: Creative Commons Zero (CC0). Attribution not required; credit Kenney.nl appreciated.
+See KENNEY_LICENSE.txt.

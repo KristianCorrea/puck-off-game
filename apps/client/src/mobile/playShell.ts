@@ -1,6 +1,6 @@
 /**
  * Mobile play shell: rotate hint, tap-to-play gate, fullscreen + landscape lock.
- * Does not change game/physics coordinates — Phaser Scale.FIT still owns sizing.
+ * Does not change game/physics coordinates — canvas RESIZE + camera letterbox.
  */
 
 type OrientationLockType = "landscape" | "landscape-primary" | "landscape-secondary";
@@ -52,6 +52,8 @@ async function lockLandscape(): Promise<void> {
 
 /** Enter immersive play mode (safe to call from any user gesture). */
 export async function enterPlayMode(): Promise<void> {
+  // Lets Phaser unlock WebAudio on the same user gesture (tap-to-play / rematch).
+  window.dispatchEvent(new Event("puckoff-play-gesture"));
   await requestFullscreen();
   await lockLandscape();
   window.dispatchEvent(new Event("resize"));

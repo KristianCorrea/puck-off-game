@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import type { GameAudio } from "../audio/GameAudio";
 import { PROTOTYPE_CONFIG, u } from "../config/prototypeConfig";
 import type { BallEntity } from "../entities/createBall";
 import type { PuckEntity } from "../entities/createPuck";
@@ -23,6 +24,7 @@ type MatterPair = {
  */
 export class GameFx {
   private readonly scene: Phaser.Scene;
+  private readonly audio: GameAudio | null;
   private readonly chargeGfx: Phaser.GameObjects.Graphics;
   private readonly trails = new Map<
     string,
@@ -40,9 +42,10 @@ export class GameFx {
 
   constructor(
     scene: Phaser.Scene,
-    opts: { pucks: PuckEntity[]; ball: BallEntity },
+    opts: { pucks: PuckEntity[]; ball: BallEntity; audio?: GameAudio },
   ) {
     this.scene = scene;
+    this.audio = opts.audio ?? null;
     ensureFxParticleTexture(scene);
     this.chargeGfx = scene.add.graphics().setDepth(14);
 
@@ -375,13 +378,21 @@ export class GameFx {
       );
       if (rel < u(1.5)) continue;
 
+      const intensity = Math.min(1, rel / u(12));
+      const againstWall =
+        a.label === "wall" ||
+        b.label === "wall" ||
+        a.label === "goal_cage" ||
+        b.label === "goal_cage";
+      this.audio?.playHit(intensity, againstWall);
+
       const support = pair.collision?.supports?.[0];
       const x =
         support?.x ?? ((a.position?.x ?? 0) + (b.position?.x ?? 0)) / 2;
       const y =
         support?.y ?? ((a.position?.y ?? 0) + (b.position?.y ?? 0)) / 2;
 
-      this.spark(x, y, Math.min(1, rel / u(12)));
+      this.spark(x, y, intensity);
     }
   };
 

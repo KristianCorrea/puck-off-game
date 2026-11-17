@@ -12,6 +12,7 @@ import {
   pointInGoalSide,
   type GoalSensors,
 } from "../entities/createGoals";
+import type { GameAudio } from "../audio/GameAudio";
 import {
   resetPuckToSpawn,
   type PuckEntity,
@@ -35,6 +36,7 @@ export class MatchController {
   readonly timer = new MatchTimer();
 
   private readonly scene: Phaser.Scene;
+  private readonly audio: GameAudio;
   private readonly pucks: PuckEntity[];
   private readonly ball: BallEntity;
   private readonly goals: GoalSensors;
@@ -45,15 +47,18 @@ export class MatchController {
   private stableFrames = 0;
   private settleElapsedMs = 0;
   private goalPauseMs = 0;
+  private turnAnnounce = false;
 
   constructor(opts: {
     scene: Phaser.Scene;
+    audio: GameAudio;
     pucks: PuckEntity[];
     ball: BallEntity;
     goals: GoalSensors;
     onRematch: () => void;
   }) {
     this.scene = opts.scene;
+    this.audio = opts.audio;
     this.pucks = opts.pucks;
     this.ball = opts.ball;
     this.goals = opts.goals;
@@ -61,6 +66,7 @@ export class MatchController {
     this.fx = new GameFx(opts.scene, {
       pucks: opts.pucks,
       ball: opts.ball,
+      audio: opts.audio,
     });
 
     this.flick = new FlickController(opts.scene, {
@@ -77,7 +83,11 @@ export class MatchController {
         );
       },
       onAimEnd: () => this.fx.hideCharge(),
+      onSelect: (puck) => {
+        if (puck) this.audio.playSelect();
+      },
       onLaunch: (puck, shot) => {
+        this.audio.playFlick(shot.power);
         this.fx.playLaunch(
           puck.body.position.x,
           puck.body.position.y,
@@ -125,6 +135,8 @@ export class MatchController {
     this.phase = "PLAYER_TURN";
     this.timer.reset();
     this.flick.setEnabled(true);
+    if (this.turnAnnounce) this.audio.playTurn();
+    this.turnAnnounce = true;
   }
 
   private beginPhysicsResolution(): void {
@@ -166,6 +178,7 @@ export class MatchController {
 
   private skipTurnOnTimeout(): void {
     this.flick.setEnabled(false);
+    this.audio.playTimeout();
     this.ejectPucksFromGoals();
     this.turns.advance();
     this.enterPlayerTurn();
@@ -178,6 +191,7 @@ export class MatchController {
 
     this.score.awardForGoalIn(goalSide);
     this.goalPauseMs = MATCH_CONFIG.goalCelebrationMs;
+    this.audio.playGoal();
     this.hud.playGoalCelebration();
 
     const winner = this.score.hasWinner();
@@ -250,6 +264,7 @@ export class MatchController {
       this.phase = "MATCH_END";
       this.timer.stop();
       this.flick.setEnabled(false);
+      this.audio.playWin();
       return;
     }
 

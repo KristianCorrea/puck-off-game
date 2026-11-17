@@ -39,6 +39,7 @@ export type FlickControllerOptions = {
     shot: { angle: number; power: number },
   ) => void;
   onAimEnd?: () => void;
+  onSelect?: (puck: PuckEntity | null) => void;
 };
 
 type PuckHandler = (
@@ -314,8 +315,10 @@ export class FlickController {
       this.disarmDomTracking();
       if (this.selected?.id === puck.id) {
         this.clearSelection();
+        this.opts.onSelect?.(null);
       } else {
         this.selected = puck;
+        this.opts.onSelect?.(puck);
       }
       return;
     }

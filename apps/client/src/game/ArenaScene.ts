@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { GameAudio } from "./audio/GameAudio";
 import { PROTOTYPE_CONFIG } from "./config/prototypeConfig";
 import { createBall } from "./entities/createBall";
 import { createGoals } from "./entities/createGoals";
@@ -15,10 +16,15 @@ import { enterPlayMode } from "../mobile/playShell";
  */
 export class ArenaScene extends Phaser.Scene {
   private match: MatchController | null = null;
+  private audio: GameAudio | null = null;
   private restartQueued = false;
 
   constructor() {
     super("ArenaScene");
+  }
+
+  preload(): void {
+    GameAudio.queue(this);
   }
 
   create(): void {
@@ -28,6 +34,11 @@ export class ArenaScene extends Phaser.Scene {
     bindLetterboxCamera(this);
     this.matter.world.setBounds(0, 0, width, height, 0, false, false, false, false);
     this.matter.world.disableGravity();
+
+    this.audio = new GameAudio(this);
+    // Desktop / already-playing: unlock on first pointer in the scene.
+    this.input.once("pointerdown", () => this.audio?.unlock());
+    window.addEventListener("puckoff-play-gesture", this.onPlayGesture);
 
     // Dim frame behind / around the pitch
     const frame = this.add.graphics().setDepth(-1);
@@ -63,6 +74,7 @@ export class ArenaScene extends Phaser.Scene {
 
     this.match = new MatchController({
       scene: this,
+      audio: this.audio,
       pucks,
       ball,
       goals,
@@ -70,8 +82,10 @@ export class ArenaScene extends Phaser.Scene {
     });
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener("puckoff-play-gesture", this.onPlayGesture);
       this.match?.destroy();
       this.match = null;
+      this.audio = null;
     });
   }
 
@@ -79,10 +93,15 @@ export class ArenaScene extends Phaser.Scene {
     this.match?.update(delta);
   }
 
+  private onPlayGesture = (): void => {
+    this.audio?.unlock();
+  };
+
   /** Defer restart so we don't tear down the scene inside a pointer/key callback. */
   private queueRematch(): void {
     if (this.restartQueued) return;
     this.restartQueued = true;
+    this.audio?.unlock();
     // User gesture: re-assert fullscreen / landscape before recreating the scene.
     void enterPlayMode();
     this.time.delayedCall(0, () => {
