@@ -3,6 +3,7 @@ import type { Server, Socket } from "socket.io";
 import {
   MATCH_CONFIG,
   SOCKET_EVENTS,
+  type AimUpdatePayload,
   type JoinRoomPayload,
   type LaunchPuckPayload,
   type PlayerId,
@@ -17,7 +18,10 @@ import {
   winnerOnAbandon,
 } from "../matches/disconnectPolicy";
 import { MatchManager, toTurnResolved } from "../matches/MatchManager";
-import { parseLaunchPayload } from "../networking/validation";
+import {
+  parseAimPayload,
+  parseLaunchPayload,
+} from "../networking/validation";
 import { generateRoomCode, normalizeRoomCode } from "./roomCode";
 
 type Seat = {
@@ -316,6 +320,7 @@ export class RoomManager {
       }
 
       this.lockReplayWindow(room, result.payload);
+      this.emitAimClear(room);
       this.io.to(room.code).emit(SOCKET_EVENTS.TURN_RESOLVED, result.payload);
 
       if (result.payload.phase === "MATCH_END") {
@@ -326,6 +331,39 @@ export class RoomManager {
     } finally {
       room.launchGuard.end();
     }
+  }
+
+  /**
+   * Cosmetic aim relay — not authoritative. Quietly ignore bad / out-of-turn aim.
+   */
+  aimUpdate(socket: Socket, payload: AimUpdatePayload): void {
+    const room = this.roomForSocket(socket.id);
+    if (!room || room.phase !== "playing") return;
+    if (room.pendingDisconnect) return;
+    if (Date.now() < room.replayUnlockAtMs) return;
+
+    const seat = this.seatForSocket(room, socket.id);
+    if (!seat) return;
+
+    const state = room.match.getState();
+    if (!state || state.phase !== "PLAYER_TURN") return;
+    if (state.currentTurn !== seat.playerId) return;
+
+    const parsed = parseAimPayload(payload);
+    if (!parsed.ok) return;
+
+    const puck = state.pucks.find((p) => p.id === parsed.payload.puckId);
+    if (!puck || puck.ownerId !== seat.playerId) return;
+
+    socket.to(room.code).emit(SOCKET_EVENTS.AIM_UPDATE, parsed.payload);
+  }
+
+  aimClear(socket: Socket): void {
+    const room = this.roomForSocket(socket.id);
+    if (!room || room.phase !== "playing") return;
+    const seat = this.seatForSocket(room, socket.id);
+    if (!seat) return;
+    socket.to(room.code).emit(SOCKET_EVENTS.AIM_CLEAR, {});
   }
 
   rematch(socket: Socket): void {
@@ -369,6 +407,7 @@ export class RoomManager {
       const ticked = room.match.tick(TICK_MS);
       if (!ticked?.skipped) continue;
       room.replayUnlockAtMs = 0;
+      this.emitAimClear(room);
       this.io.to(room.code).emit(
         SOCKET_EVENTS.TURN_RESOLVED,
         toTurnResolved(ticked.state, "timeout"),
@@ -508,6 +547,7 @@ export class RoomManager {
 
   private startReconnectWindow(room: Room, playerId: PlayerId): void {
     this.clearPendingDisconnect(room);
+    this.emitAimClear(room);
 
     const reconnectMs = DISCONNECT_POLICY.reconnectWindowMs;
     const deadlineMs = Date.now() + reconnectMs;
@@ -548,6 +588,7 @@ export class RoomManager {
   ): void {
     this.clearCountdown(room);
     this.clearPendingDisconnect(room);
+    this.emitAimClear(room);
     room.launchGuard.end();
     room.replayUnlockAtMs = 0;
 
@@ -595,6 +636,10 @@ export class RoomManager {
       clearTimeout(room.pendingDisconnect.timer);
       room.pendingDisconnect = null;
     }
+  }
+
+  private emitAimClear(room: Room): void {
+    this.io.to(room.code).emit(SOCKET_EVENTS.AIM_CLEAR, {});
   }
 
   private roomForSocket(socketId: string): Room | null {

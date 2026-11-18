@@ -1,6 +1,7 @@
 import type { Server, Socket } from "socket.io";
 import {
   SOCKET_EVENTS,
+  type AimUpdatePayload,
   type JoinRoomPayload,
   type LaunchPuckPayload,
   type ReconnectRoomPayload,
@@ -52,6 +53,22 @@ export function bindSocketHandlers(io: Server, rooms: RoomManager): void {
       } catch (err) {
         console.error("[server] LAUNCH_PUCK", err);
         socket.emit(SOCKET_EVENTS.REJECT_LAUNCH, { reason: "SERVER_ERROR" });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.AIM_UPDATE, (payload: AimUpdatePayload) => {
+      try {
+        rooms.aimUpdate(socket, payload);
+      } catch (err) {
+        console.error("[server] AIM_UPDATE", err);
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.AIM_CLEAR, () => {
+      try {
+        rooms.aimClear(socket);
+      } catch (err) {
+        console.error("[server] AIM_CLEAR", err);
       }
     });
 

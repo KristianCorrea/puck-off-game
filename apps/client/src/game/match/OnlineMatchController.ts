@@ -4,6 +4,7 @@ import { Match } from "@puck-off/game-engine";
 import {
   MATCH_CONFIG,
   SOCKET_EVENTS,
+  type AimUpdatePayload,
   type CountdownPayload,
   type MatchAbandonedPayload,
   type MatchPhase,
@@ -22,6 +23,7 @@ import type { GameAudio } from "../audio/GameAudio";
 import type { PuckEntity } from "../entities/createPuck";
 import { GameFx } from "../fx/GameFx";
 import { FlickController } from "../input/FlickController";
+import { AimIndicator } from "../ui/AimIndicator";
 import {
   clearResumeSession,
   loadResumeSession,
@@ -32,6 +34,8 @@ import { MatchTimer } from "./MatchTimer";
 import { ScoreKeeper } from "./ScoreKeeper";
 import { TurnManager } from "./TurnManager";
 import { paintMatchState } from "./paintMatchState";
+
+const AIM_EMIT_MIN_MS = 50;
 
 /**
  * Online session: server Match is authority.
@@ -56,6 +60,8 @@ export class OnlineMatchController {
   private readonly hud: MatchHud;
   private readonly fx: GameFx;
   private readonly engine: Match;
+  /** Opponent's live fling arrow (cosmetic relay). */
+  private readonly remoteAim: AimIndicator;
 
   private goalPauseMs = 0;
   private turnAnnounce = false;
@@ -68,6 +74,7 @@ export class OnlineMatchController {
   private destroyed = false;
   private pausedForDisconnect = false;
   private selfDisconnected = false;
+  private lastAimEmitAt = 0;
   private readonly onLeave: () => void;
 
   constructor(opts: {
@@ -108,6 +115,7 @@ export class OnlineMatchController {
       ball: opts.ball,
       audio: opts.audio,
     });
+    this.remoteAim = new AimIndicator(opts.scene);
 
     this.flick = new FlickController(opts.scene, {
       getSelectablePucks: () =>
@@ -121,14 +129,19 @@ export class OnlineMatchController {
           shot.power,
           puck.sprite.fillColor,
         );
+        this.emitAimUpdate(puck, shot);
       },
-      onAimEnd: () => this.fx.hideCharge(),
+      onAimEnd: () => {
+        this.fx.hideCharge();
+        this.emitAimClear();
+      },
       onSelect: (puck) => {
         if (puck) this.audio.playSelect();
       },
       onLaunch: (puck, shot) => {
         if (!this.canFlick()) return;
 
+        this.emitAimClear();
         this.audio.playFlick(shot.power);
         this.fx.playLaunch(
           puck.body.position.x,
@@ -172,9 +185,12 @@ export class OnlineMatchController {
     this.socket.off(SOCKET_EVENTS.ROOM_STATE, this.onRoomState);
     this.socket.off(SOCKET_EVENTS.OPPONENT_DISCONNECTED, this.onOpponentDisconnected);
     this.socket.off(SOCKET_EVENTS.MATCH_ABANDONED, this.onMatchAbandoned);
+    this.socket.off(SOCKET_EVENTS.AIM_UPDATE, this.onAimUpdate);
+    this.socket.off(SOCKET_EVENTS.AIM_CLEAR, this.onAimClear);
     this.socket.off(SOCKET_EVENTS.ERROR, this.onError);
     this.socket.off("disconnect", this.onSocketDisconnect);
     this.socket.off("connect", this.onSocketConnect);
+    this.remoteAim.destroy();
     this.flick.destroy();
     this.hud.destroy();
     this.fx.destroy();
@@ -196,6 +212,7 @@ export class OnlineMatchController {
 
   leave(): void {
     if (this.destroyed) return;
+    this.emitAimClear();
     clearResumeSession();
     this.socket.emit(SOCKET_EVENTS.LEAVE_ROOM);
     this.socket.disconnect();
@@ -246,10 +263,66 @@ export class OnlineMatchController {
     this.socket.on(SOCKET_EVENTS.ROOM_STATE, this.onRoomState);
     this.socket.on(SOCKET_EVENTS.OPPONENT_DISCONNECTED, this.onOpponentDisconnected);
     this.socket.on(SOCKET_EVENTS.MATCH_ABANDONED, this.onMatchAbandoned);
+    this.socket.on(SOCKET_EVENTS.AIM_UPDATE, this.onAimUpdate);
+    this.socket.on(SOCKET_EVENTS.AIM_CLEAR, this.onAimClear);
     this.socket.on(SOCKET_EVENTS.ERROR, this.onError);
     this.socket.on("disconnect", this.onSocketDisconnect);
     this.socket.on("connect", this.onSocketConnect);
   }
+
+  private emitAimUpdate(
+    puck: PuckEntity,
+    shot: { angle: number; power: number },
+  ): void {
+    if (!this.canFlick()) return;
+    const now = Date.now();
+    if (now - this.lastAimEmitAt < AIM_EMIT_MIN_MS) return;
+    this.lastAimEmitAt = now;
+    this.socket.emit(SOCKET_EVENTS.AIM_UPDATE, {
+      puckId: puck.id,
+      angle: shot.angle,
+      power: shot.power,
+    } satisfies AimUpdatePayload);
+  }
+
+  private emitAimClear(): void {
+    this.lastAimEmitAt = 0;
+    if (this.destroyed) return;
+    this.socket.emit(SOCKET_EVENTS.AIM_CLEAR, {});
+  }
+
+  private hideRemoteAim(): void {
+    this.remoteAim.hide();
+  }
+
+  private onAimUpdate = (payload: AimUpdatePayload): void => {
+    if (this.destroyed) return;
+    // Only paint while watching the opponent's turn.
+    if (this.turns.current === this.myPlayerId) return;
+    if (this.phase !== "PLAYER_TURN") return;
+    if (this.pausedForDisconnect || this.selfDisconnected) return;
+
+    const puck = this.pucks.find((p) => p.id === payload.puckId);
+    if (!puck || puck.ownerId === this.myPlayerId) return;
+
+    const power = Math.max(0, Math.min(1, payload.power));
+    if (!Number.isFinite(payload.angle) || power <= 0) {
+      this.hideRemoteAim();
+      return;
+    }
+
+    this.remoteAim.show(
+      puck.body.position.x,
+      puck.body.position.y,
+      payload.angle,
+      power,
+      puck.sprite.fillColor,
+    );
+  };
+
+  private onAimClear = (): void => {
+    if (!this.destroyed) this.hideRemoteAim();
+  };
 
   private onSocketDisconnect = (): void => {
     if (this.destroyed) return;
@@ -271,6 +344,8 @@ export class OnlineMatchController {
 
   private onTurnResolved = (payload: TurnResolvedPayload): void => {
     if (this.destroyed) return;
+
+    this.hideRemoteAim();
 
     if (payload.reason === "timeout") {
       this.audio.playTimeout();
@@ -307,6 +382,7 @@ export class OnlineMatchController {
 
   private onRejectLaunch = (payload: RejectLaunchPayload): void => {
     if (this.destroyed) return;
+    this.hideRemoteAim();
     this.awaitingResolve = false;
     this.replay = null;
     this.pendingAuthority = null;
@@ -321,6 +397,7 @@ export class OnlineMatchController {
 
   private onCountdown = (payload: CountdownPayload): void => {
     if (this.destroyed) return;
+    this.hideRemoteAim();
     this.flick.setEnabled(false);
     this.hud.setCountdown(payload.seconds);
     this.hud.setStatusHint(null);
@@ -328,6 +405,7 @@ export class OnlineMatchController {
 
   private onMatchStart = (payload: MatchStartPayload): void => {
     if (this.destroyed) return;
+    this.hideRemoteAim();
     this.awaitingResolve = false;
     this.replay = null;
     this.pendingAuthority = null;
@@ -378,6 +456,7 @@ export class OnlineMatchController {
   ): void => {
     if (this.destroyed) return;
     if (payload.playerId === this.myPlayerId) return;
+    this.hideRemoteAim();
     this.pausedForDisconnect = true;
     this.flick.setEnabled(false);
     this.timer.stop();
