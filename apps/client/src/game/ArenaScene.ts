@@ -85,6 +85,7 @@ export class ArenaScene extends Phaser.Scene {
         pucks,
         ball,
         onRematch: () => this.queueRematch(),
+        onLeave: () => this.leaveMatch(),
       });
     }
 
@@ -121,7 +122,7 @@ export class ArenaScene extends Phaser.Scene {
         roomCode: lobby.code,
         matchStart: lobby.matchStart,
         onRematch: () => this.queueRematch(),
-        onLeave: () => this.leaveOnline(),
+        onLeave: () => this.leaveMatch(),
       });
     } catch (err) {
       console.error("[online] lobby failed", err);
@@ -142,7 +143,8 @@ export class ArenaScene extends Phaser.Scene {
     });
   }
 
-  private leaveOnline(): void {
+  /** Soft exit to mode chooser (local or online). */
+  private leaveMatch(): void {
     this.match?.destroy();
     this.match = null;
     try {

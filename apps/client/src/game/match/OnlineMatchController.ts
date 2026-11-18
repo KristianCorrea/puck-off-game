@@ -97,10 +97,10 @@ export class OnlineMatchController {
 
     this.hud = new MatchHud(opts.scene, {
       onRematch: opts.onRematch,
+      onLeave: () => this.leave(),
       audio: opts.audio,
       online: {
         myPlayerId: opts.playerId,
-        onLeave: () => this.leave(),
       },
     });
     this.fx = new GameFx(opts.scene, {

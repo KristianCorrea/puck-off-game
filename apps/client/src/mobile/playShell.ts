@@ -27,7 +27,7 @@ function isPortrait(): boolean {
   return window.matchMedia("(orientation: portrait)").matches;
 }
 
-function isFullscreen(): boolean {
+export function isFullscreen(): boolean {
   const doc = document as Document & {
     webkitFullscreenElement?: Element | null;
   };
@@ -48,6 +48,33 @@ async function requestFullscreen(): Promise<void> {
   } catch {
     // iOS Safari / denied — continue without fullscreen.
   }
+}
+
+async function exitFullscreen(): Promise<void> {
+  if (!isFullscreen()) return;
+  const doc = document as Document & {
+    webkitExitFullscreen?: () => Promise<void> | void;
+  };
+  try {
+    if (document.exitFullscreen) {
+      await document.exitFullscreen();
+    } else if (doc.webkitExitFullscreen) {
+      await doc.webkitExitFullscreen();
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** Toggle document fullscreen (must run from a user gesture). */
+export async function toggleFullscreen(): Promise<void> {
+  if (isFullscreen()) {
+    await exitFullscreen();
+  } else {
+    await requestFullscreen();
+    await lockLandscape();
+  }
+  refreshGameViewport();
 }
 
 async function lockLandscape(): Promise<void> {

@@ -46,6 +46,7 @@ export class MatchController {
     pucks: PuckEntity[];
     ball: BallEntity;
     onRematch: () => void;
+    onLeave: () => void;
   }) {
     this.scene = opts.scene;
     this.audio = opts.audio;
@@ -56,6 +57,7 @@ export class MatchController {
 
     this.hud = new MatchHud(opts.scene, {
       onRematch: opts.onRematch,
+      onLeave: opts.onLeave,
       audio: opts.audio,
     });
     this.fx = new GameFx(opts.scene, {
