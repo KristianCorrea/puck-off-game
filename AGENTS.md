@@ -18,7 +18,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - **Thin first:** prove the flick (Phase 0–1) before full monorepo / server / engine.
 - **Do not** invent economy, accounts, matchmaking, cosmetics, or formation pickers for MVP.
 - If something is ambiguous, choose the simplest option that preserves core play and isolate it (config / small function).
-- Phase 3 complete: `@puck-off/shared` + `@puck-off/game-engine`; client is view/input over the engine. Next: Phase 4 server.
+- Phase 4 underway: `apps/server` (Socket.IO + rooms + authoritative `Match`). Local hot-seat unchanged. Next: wire client online session.
 
 ## Locked MVP decisions (quick)
 
@@ -39,7 +39,8 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 
 - Client: React + Vite + TypeScript + Phaser 3 + Matter.js
 - Server: Node + TypeScript + Socket.IO
-- Packages: `game-engine`, `shared` (server app in Phase 4)
+- Packages: `game-engine`, `shared`
+- Server: `apps/server` — `npm run dev:server` (default `http://localhost:3001`)
 
 ## Ownership cheat sheet
 

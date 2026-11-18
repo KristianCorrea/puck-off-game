@@ -23,14 +23,23 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
-**Phase 3:** engine-driven hot-seat match — 5 teal (P1) vs 5 coral (P2) pucks. Alternate turns, first to 3, ~20s turn timer. Shared rules/physics in `packages/shared` + `packages/game-engine`; client paints Match state.
+**Local (Phase 3):** engine-driven hot-seat — 5v5, first to 3, ~20s turns. Shared rules in `packages/shared` + `packages/game-engine`.
+
+### Run the multiplayer server
+
+```bash
+npm run dev:server
+```
+
+Listens on `http://localhost:3001` (`GET /health`). Room protocol: `CREATE_ROOM` / `JOIN_ROOM` / `READY` / `LAUNCH_PUCK` → `TURN_RESOLVED`. Client online wiring is next.
 
 ## Workspace
 
 ```text
 apps/client            Vite + TypeScript + Phaser 3 (view + input)
-packages/shared        GAME_CONFIG, types, protocol stubs
-packages/game-engine   Authoritative Match + Matter (local now; server later)
+apps/server            Node + Socket.IO + game-engine Match (authority)
+packages/shared        GAME_CONFIG, types, socket protocol
+packages/game-engine   Authoritative Match + Matter
 docs/                  Plan + phase guides
 ```
 
@@ -42,4 +51,4 @@ docs/                  Plan + phase guides
 | [docs/PLAN.md](./docs/PLAN.md) | Rules, architecture, MVP scope |
 | [docs/phases/](./docs/phases/README.md) | Phase-by-phase guides |
 
-Currently at **Phase 3 complete** — engine-driven local match. Next: [Phase 4 multiplayer server](./docs/phases/PHASE_04_MULTIPLAYER_SERVER.md).
+Currently at **Phase 4 in progress** — server rooms + Match authority up; client online session next. See [Phase 4](./docs/phases/PHASE_04_MULTIPLAYER_SERVER.md).
