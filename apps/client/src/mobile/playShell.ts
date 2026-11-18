@@ -173,7 +173,14 @@ export function installPlayShell(): void {
     playStarted = true;
     setVisible(tap, false);
     setVisible(resume, false);
-    await enterPlayMode();
+    // Local starts immediately → fullscreen now.
+    // Online waits for Ready / match start (still need a user gesture).
+    if (mode === "local") {
+      await enterPlayMode();
+    } else {
+      window.dispatchEvent(new Event("puckoff-play-gesture"));
+      refreshGameViewport();
+    }
     entering = false;
     syncOverlays();
     window.dispatchEvent(

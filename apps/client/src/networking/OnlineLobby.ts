@@ -14,6 +14,7 @@ import {
   loadResumeSession,
   saveResumeSession,
 } from "./resumeSession";
+import { enterPlayMode } from "../mobile/playShell";
 import { connectSocket } from "./socket";
 
 export type OnlineLobbyResult = {
@@ -192,6 +193,8 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       if (settled || !myPlayerId || !roomCode) return;
       settled = true;
       cleanupUi();
+      // Best-effort if Ready already entered fullscreen; no-ops when already on.
+      void enterPlayMode();
       resolve({
         socket,
         playerId: myPlayerId,
@@ -350,10 +353,13 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       e.preventDefault();
       e.stopPropagation();
       if (stage !== "room") return;
+      const becomingReady = !myReady;
       socket.emit(SOCKET_EVENTS.READY);
       // Optimistic label; ROOM_STATE corrects if needed.
-      syncReadyButton(!myReady, true);
-      setStatus(myReady ? "Ready" : "Not ready");
+      syncReadyButton(becomingReady, true);
+      setStatus(becomingReady ? "Ready" : "Not ready");
+      // Fullscreen on Ready (user gesture) — not on ONLINE mode pick.
+      if (becomingReady) void enterPlayMode();
     });
 
     copyBtn?.addEventListener("click", (e) => {
