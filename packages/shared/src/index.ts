@@ -29,6 +29,8 @@ export type {
   MatchState,
 } from "./types/MatchState";
 
+export type { PhysicsKeyframe } from "./types/PhysicsKeyframe";
+
 export {
   SOCKET_EVENTS,
   type SocketEventName,
