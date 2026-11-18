@@ -219,7 +219,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
         });
         return;
       }
-      setStatus("");
+      setStatus("Create or join a room.");
       setStage("gate");
       setGateEnabled(true);
     });
