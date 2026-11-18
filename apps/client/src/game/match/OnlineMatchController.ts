@@ -97,6 +97,7 @@ export class OnlineMatchController {
 
     this.hud = new MatchHud(opts.scene, {
       onRematch: opts.onRematch,
+      audio: opts.audio,
       online: {
         myPlayerId: opts.playerId,
         onLeave: () => this.leave(),

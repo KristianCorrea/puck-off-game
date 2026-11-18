@@ -54,7 +54,10 @@ export class MatchController {
     this.engine = new Match();
     this.engine.start();
 
-    this.hud = new MatchHud(opts.scene, { onRematch: opts.onRematch });
+    this.hud = new MatchHud(opts.scene, {
+      onRematch: opts.onRematch,
+      audio: opts.audio,
+    });
     this.fx = new GameFx(opts.scene, {
       pucks: opts.pucks,
       ball: opts.ball,
