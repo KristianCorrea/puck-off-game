@@ -8,13 +8,18 @@ import { createWalls } from "./entities/createWalls";
 import { drawPitchMarkings } from "./entities/drawPitch";
 import { getDefenseLayout } from "./match/layouts/defenseLayout";
 import { MatchController } from "./match/MatchController";
+import { OnlineMatchController } from "./match/OnlineMatchController";
 import { bindLetterboxCamera } from "./scale/letterboxCamera";
+import { getPlayMode } from "../networking/playMode";
+import { runOnlineLobby } from "../networking/OnlineLobby";
+
+type ActiveMatch = MatchController | OnlineMatchController;
 
 /**
- * Phase 2: full local hot-seat match on one machine.
+ * Arena: local hot-seat (default) or online session (?mode=online / mode pick).
  */
 export class ArenaScene extends Phaser.Scene {
-  private match: MatchController | null = null;
+  private match: ActiveMatch | null = null;
   private audio: GameAudio | null = null;
   private rematchQueued = false;
 
@@ -33,15 +38,12 @@ export class ArenaScene extends Phaser.Scene {
     bindLetterboxCamera(this);
     this.matter.world.setBounds(0, 0, width, height, 0, false, false, false, false);
     this.matter.world.disableGravity();
-    // One physics truth: @puck-off/game-engine. Client Matter is display/input only.
     this.matter.world.autoUpdate = false;
 
     this.audio = new GameAudio(this);
-    // Desktop / already-playing: unlock on first pointer in the scene.
     this.input.once("pointerdown", () => this.audio?.unlock());
     window.addEventListener("puckoff-play-gesture", this.onPlayGesture);
 
-    // Dim frame behind / around the pitch
     const frame = this.add.graphics().setDepth(-1);
     frame.fillStyle(0x050b12, 1);
     frame.fillRect(0, 0, width, height);
@@ -50,7 +52,7 @@ export class ArenaScene extends Phaser.Scene {
 
     createWalls(this);
     drawPitchMarkings(this);
-    createGoals(this); // visual cages; scoring is engine-side
+    createGoals(this);
 
     const ball = createBall(this);
     const layout = getDefenseLayout();
@@ -73,13 +75,18 @@ export class ArenaScene extends Phaser.Scene {
       ),
     ];
 
-    this.match = new MatchController({
-      scene: this,
-      audio: this.audio,
-      pucks,
-      ball,
-      onRematch: () => this.queueRematch(),
-    });
+    const mode = getPlayMode();
+    if (mode === "online") {
+      void this.startOnline(pucks, ball);
+    } else {
+      this.match = new MatchController({
+        scene: this,
+        audio: this.audio,
+        pucks,
+        ball,
+        onRematch: () => this.queueRematch(),
+      });
+    }
 
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener("puckoff-play-gesture", this.onPlayGesture);
@@ -93,11 +100,36 @@ export class ArenaScene extends Phaser.Scene {
     this.match?.update(delta);
   }
 
+  private async startOnline(
+    pucks: ReturnType<typeof createPuckAt>[],
+    ball: ReturnType<typeof createBall>,
+  ): Promise<void> {
+    if (!this.audio) return;
+    try {
+      const lobby = await runOnlineLobby();
+      if (!this.sys.isActive()) {
+        lobby.socket.disconnect();
+        return;
+      }
+      this.match = new OnlineMatchController({
+        scene: this,
+        audio: this.audio,
+        pucks,
+        ball,
+        socket: lobby.socket,
+        playerId: lobby.playerId,
+        matchStart: lobby.matchStart,
+        onRematch: () => this.queueRematch(),
+      });
+    } catch (err) {
+      console.error("[online] lobby failed", err);
+    }
+  }
+
   private onPlayGesture = (): void => {
     this.audio?.unlock();
   };
 
-  /** Soft rematch next tick — never tear down the Matter scene. */
   private queueRematch(): void {
     if (this.rematchQueued || !this.match) return;
     this.rematchQueued = true;

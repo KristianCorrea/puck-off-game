@@ -31,7 +31,9 @@ Open the URL Vite prints (usually `http://localhost:5173`).
 npm run dev:server
 ```
 
-Listens on `http://localhost:3001` (`GET /health`). Room protocol: `CREATE_ROOM` / `JOIN_ROOM` / `READY` / `LAUNCH_PUCK` → `TURN_RESOLVED`. Client online wiring is next.
+Listens on `http://localhost:3001` (`GET /health`).
+
+Client: choose **ONLINE** on the start screen (or `?mode=online`). Create/join room → Ready on both windows. Optional `?server=http://host:3001`.
 
 ## Workspace
 

@@ -134,6 +134,25 @@ describe("Match engine", () => {
     match.destroy();
   });
 
+  it("adoptState restores snapshot fields and body poses", () => {
+    const match = new Match();
+    match.start();
+    launchAndSettle(match, {
+      playerId: "player1",
+      puckId: "p1_2",
+      angle: Math.PI / 2,
+      power: 0.2,
+    });
+    const snapshot = match.getState();
+    match.rematch();
+    match.adoptState(snapshot);
+    const restored = match.getState();
+    expect(restored.currentTurn).toBe(snapshot.currentTurn);
+    expect(restored.score).toEqual(snapshot.score);
+    expect(restored.ball.position.x).toBeCloseTo(snapshot.ball.position.x, 5);
+    match.destroy();
+  });
+
   it("step advances bodies after applyAction without settling instantly", () => {
     const match = new Match();
     match.start();

@@ -3,6 +3,8 @@
  * Does not change game/physics coordinates — canvas RESIZE + camera letterbox.
  */
 
+import { setPlayMode, type PlayMode } from "../networking/playMode";
+
 type OrientationLockType = "landscape" | "landscape-primary" | "landscape-secondary";
 
 type ScreenOrientationWithLock = ScreenOrientation & {
@@ -52,7 +54,6 @@ async function lockLandscape(): Promise<void> {
 
 /** Enter immersive play mode (safe to call from any user gesture). */
 export async function enterPlayMode(): Promise<void> {
-  // Lets Phaser unlock WebAudio on the same user gesture (tap-to-play / rematch).
   window.dispatchEvent(new Event("puckoff-play-gesture"));
   await requestFullscreen();
   await lockLandscape();
@@ -67,53 +68,58 @@ function setVisible(el: HTMLElement | null, visible: boolean): void {
 
 /**
  * Wire DOM overlays. Call once from main before/after creating the Phaser game.
- * On touch phones, blocks input until TAP TO PLAY (also requests fullscreen).
+ * Mode buttons set local/online then dismiss the gate (and request fullscreen on touch).
  */
 export function installPlayShell(): void {
   const tap = document.getElementById("tap-to-play");
-  const tapBtn = document.getElementById("tap-to-play-btn");
   const rotate = document.getElementById("rotate-overlay");
+  const localBtn = document.getElementById("play-local-btn");
+  const onlineBtn = document.getElementById("play-online-btn");
 
-  // Coarse pointers (phones/tablets): require an explicit gesture for fullscreen.
-  let playStarted = !isCoarsePointer();
+  // Desktop with ?mode=… can skip the chooser; touch still needs a gesture.
+  const params = new URLSearchParams(window.location.search);
+  const queryMode = params.get("mode");
+  let playStarted =
+    !isCoarsePointer() && (queryMode === "local" || queryMode === "online");
 
   const syncOverlays = (): void => {
     const needRotate =
       isPortrait() && (isCoarsePointer() || window.innerWidth < 900);
     setVisible(rotate, needRotate);
-    // Rotate takes priority; restore tap gate after they flip to landscape.
     setVisible(tap, !needRotate && !playStarted);
   };
 
   let entering = false;
-  const dismissTapGate = async (): Promise<void> => {
+  const dismissTapGate = async (mode: PlayMode): Promise<void> => {
     if (playStarted || entering) return;
     entering = true;
+    setPlayMode(mode);
     playStarted = true;
     setVisible(tap, false);
     await enterPlayMode();
     entering = false;
     syncOverlays();
+    // Arena may already be creating — reload so create() sees the mode.
+    // Only reload if Phaser already booted past create with wrong mode.
+    window.dispatchEvent(
+      new CustomEvent("puckoff-mode-chosen", { detail: { mode } }),
+    );
   };
 
-  tapBtn?.addEventListener(
+  const onModeClick = (event: Event, mode: PlayMode): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    void dismissTapGate(mode);
+  };
+
+  localBtn?.addEventListener(
     "click",
-    (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      void dismissTapGate();
-    },
+    (e) => onModeClick(e, "local"),
     { passive: false },
   );
-
-  // Whole overlay is tappable (easier than hunting the button).
-  tap?.addEventListener(
-    "pointerup",
-    (event) => {
-      if (!tap.classList.contains("is-visible")) return;
-      event.preventDefault();
-      void dismissTapGate();
-    },
+  onlineBtn?.addEventListener(
+    "click",
+    (e) => onModeClick(e, "online"),
     { passive: false },
   );
 

@@ -118,6 +118,67 @@
         line-height: 1;
         transform: rotate(90deg);
       }
+
+      .shell-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        justify-content: center;
+        margin-top: 0.5rem;
+      }
+
+      .shell-cta.secondary {
+        background: #334155;
+        color: #e2e8f0;
+      }
+
+      .shell-cta.secondary:active {
+        background: #475569;
+      }
+
+      .shell-cta:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .lobby-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+        align-items: center;
+        width: min(100%, 22rem);
+      }
+
+      .lobby-row input {
+        flex: 1 1 8rem;
+        min-width: 0;
+        border: 1px solid #334155;
+        border-radius: 0.35rem;
+        padding: 0.7rem 0.85rem;
+        font: inherit;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #f8fafc;
+        background: #0f172a;
+      }
+
+      .lobby-code {
+        margin: 0.25rem 0 0;
+        font-family: "Teko", "Arial Narrow", Impact, sans-serif;
+        font-size: clamp(2rem, 10vw, 3rem);
+        letter-spacing: 0.14em;
+        color: #fbbf24;
+      }
+
+      .lobby-server {
+        margin: 0;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        word-break: break-all;
+      }
     </style>
   </head>
   <body>
@@ -126,9 +187,55 @@
     <div id="tap-to-play" class="shell-overlay" role="dialog" aria-modal="true">
       <h1>PUCK OFF</h1>
       <p>Landscape play · flick pucks · first to 3</p>
-      <button type="button" class="shell-cta" id="tap-to-play-btn">
-        TAP TO PLAY
-      </button>
+      <div class="shell-actions">
+        <button type="button" class="shell-cta" id="play-local-btn" data-mode="local">
+          LOCAL
+        </button>
+        <button
+          type="button"
+          class="shell-cta secondary"
+          id="play-online-btn"
+          data-mode="online"
+        >
+          ONLINE
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="online-lobby"
+      class="shell-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+    >
+      <h1>ONLINE</h1>
+      <p id="lobby-status">Connecting…</p>
+      <p class="lobby-code" id="lobby-code">————</p>
+      <p class="lobby-server" id="lobby-server"></p>
+      <div class="shell-actions">
+        <button type="button" class="shell-cta" id="lobby-create-btn">
+          CREATE ROOM
+        </button>
+      </div>
+      <div class="lobby-row">
+        <input
+          id="lobby-join-input"
+          type="text"
+          maxlength="8"
+          placeholder="CODE"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button type="button" class="shell-cta secondary" id="lobby-join-btn">
+          JOIN
+        </button>
+      </div>
+      <div class="shell-actions">
+        <button type="button" class="shell-cta" id="lobby-ready-btn" disabled>
+          READY
+        </button>
+      </div>
     </div>
 
     <div id="rotate-overlay" class="shell-overlay" role="status" aria-live="polite">

@@ -18,7 +18,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - **Thin first:** prove the flick (Phase 0–1) before full monorepo / server / engine.
 - **Do not** invent economy, accounts, matchmaking, cosmetics, or formation pickers for MVP.
 - If something is ambiguous, choose the simplest option that preserves core play and isolate it (config / small function).
-- Phase 4 underway: `apps/server` (Socket.IO + rooms + authoritative `Match`). Local hot-seat unchanged. Next: wire client online session.
+- Phase 4 underway: `apps/server` + client online session (minimal lobby). Local hot-seat via **LOCAL** still default path.
 
 ## Locked MVP decisions (quick)
 

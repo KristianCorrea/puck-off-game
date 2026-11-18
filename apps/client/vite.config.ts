@@ -16,6 +16,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["matter-js"],
+    include: ["matter-js", "socket.io-client"],
   },
 });
