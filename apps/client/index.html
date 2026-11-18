@@ -179,6 +179,21 @@
         color: #64748b;
         word-break: break-all;
       }
+
+      #lobby-countdown {
+        display: none;
+        margin: 0.25rem 0 0;
+        font-family: "Teko", "Arial Narrow", Impact, sans-serif;
+        font-size: clamp(3.5rem, 18vw, 6rem);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        color: #fbbf24;
+      }
+
+      #lobby-countdown.is-visible {
+        display: block;
+      }
     </style>
   </head>
   <body>
@@ -212,6 +227,7 @@
       <h1>ONLINE</h1>
       <p id="lobby-status">Connecting…</p>
       <p class="lobby-code" id="lobby-code">————</p>
+      <p id="lobby-countdown" aria-live="polite"></p>
       <p class="lobby-server" id="lobby-server"></p>
       <div class="shell-actions">
         <button type="button" class="shell-cta" id="lobby-create-btn">
@@ -234,6 +250,14 @@
       <div class="shell-actions">
         <button type="button" class="shell-cta" id="lobby-ready-btn" disabled>
           READY
+        </button>
+        <button
+          type="button"
+          class="shell-cta secondary"
+          id="lobby-leave-btn"
+          disabled
+        >
+          LEAVE
         </button>
       </div>
     </div>

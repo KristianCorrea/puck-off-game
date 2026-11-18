@@ -14,11 +14,13 @@ export const SOCKET_EVENTS = {
   READY: "READY",
   LAUNCH_PUCK: "LAUNCH_PUCK",
   REMATCH: "REMATCH",
+  LEAVE_ROOM: "LEAVE_ROOM",
 
   // Server → client
   ROOM_CREATED: "ROOM_CREATED",
   ROOM_STATE: "ROOM_STATE",
   PLAYER_JOINED: "PLAYER_JOINED",
+  COUNTDOWN: "COUNTDOWN",
   MATCH_START: "MATCH_START",
   TURN_RESOLVED: "TURN_RESOLVED",
   REJECT_LAUNCH: "REJECT_LAUNCH",
@@ -65,7 +67,7 @@ export type RoomPlayerInfo = {
 export type RoomStatePayload = {
   code: string;
   players: RoomPlayerInfo[];
-  phase: "lobby" | "playing" | "ended";
+  phase: "lobby" | "countdown" | "playing" | "ended";
   yourPlayerId: PlayerId | null;
 };
 
@@ -73,6 +75,11 @@ export type PlayerJoinedPayload = {
   code: string;
   playerId: PlayerId;
   players: RoomPlayerInfo[];
+};
+
+export type CountdownPayload = {
+  code: string;
+  seconds: number;
 };
 
 export type MatchStartPayload = {

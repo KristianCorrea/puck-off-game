@@ -43,6 +43,7 @@ export {
   type RoomPlayerInfo,
   type RoomStatePayload,
   type PlayerJoinedPayload,
+  type CountdownPayload,
   type MatchStartPayload,
   type TurnResolvedPayload,
   type RejectLaunchPayload,

@@ -14,6 +14,11 @@ import type { TurnManager } from "./TurnManager";
 const FONT = '"Nunito", system-ui, sans-serif';
 const DISPLAY = '"Teko", "Arial Narrow", Impact, sans-serif';
 
+export type MatchHudOnlineOpts = {
+  myPlayerId: PlayerId;
+  onLeave: () => void;
+};
+
 export class MatchHud {
   private readonly scene: Phaser.Scene;
   private readonly panel: Phaser.GameObjects.Graphics;
@@ -29,12 +34,20 @@ export class MatchHud {
   private readonly metaText: Phaser.GameObjects.Text;
   private readonly bannerText: Phaser.GameObjects.Text;
   private readonly rematchText: Phaser.GameObjects.Text;
+  private readonly leaveText: Phaser.GameObjects.Text | null;
   private readonly celebration: GoalCelebration;
   private readonly onRematch: () => void;
+  private readonly online: MatchHudOnlineOpts | null;
+  private countdownSeconds: number | null = null;
+  private statusHint: string | null = null;
 
-  constructor(scene: Phaser.Scene, opts: { onRematch: () => void }) {
+  constructor(
+    scene: Phaser.Scene,
+    opts: { onRematch: () => void; online?: MatchHudOnlineOpts },
+  ) {
     this.scene = scene;
     this.onRematch = opts.onRematch;
+    this.online = opts.online ?? null;
     this.celebration = new GoalCelebration(scene);
 
     const { width, hudHeight } = PROTOTYPE_CONFIG.arena;
@@ -125,14 +138,19 @@ export class MatchHud {
       .setVisible(false);
 
     this.rematchText = scene.add
-      .text(field.centerX, field.centerY + u(56), "PLAY AGAIN  ·  R", {
-        fontFamily: FONT,
-        fontSize: `${u(18)}px`,
-        color: "#0f172a",
-        backgroundColor: "#fbbf24",
-        fontStyle: "800",
-        padding: { x: u(28), y: u(16) },
-      })
+      .text(
+        field.centerX - (this.online ? u(90) : 0),
+        field.centerY + u(56),
+        "PLAY AGAIN  ·  R",
+        {
+          fontFamily: FONT,
+          fontSize: `${u(18)}px`,
+          color: "#0f172a",
+          backgroundColor: "#fbbf24",
+          fontStyle: "800",
+          padding: { x: u(28), y: u(16) },
+        },
+      )
       .setOrigin(0.5)
       .setDepth(51)
       .setVisible(false)
@@ -148,8 +166,46 @@ export class MatchHud {
       this.onRematch();
     });
 
+    if (this.online) {
+      this.leaveText = scene.add
+        .text(field.centerX + u(110), field.centerY + u(56), "LEAVE", {
+          fontFamily: FONT,
+          fontSize: `${u(18)}px`,
+          color: "#e2e8f0",
+          backgroundColor: "#334155",
+          fontStyle: "800",
+          padding: { x: u(28), y: u(16) },
+        })
+        .setOrigin(0.5)
+        .setDepth(51)
+        .setVisible(false)
+        .setInteractive({ useHandCursor: true });
+
+      this.leaveText.on("pointerover", () => {
+        this.leaveText?.setStyle({ backgroundColor: "#475569" });
+      });
+      this.leaveText.on("pointerout", () => {
+        this.leaveText?.setStyle({ backgroundColor: "#334155" });
+      });
+      this.leaveText.on("pointerdown", () => {
+        this.online?.onLeave();
+      });
+    } else {
+      this.leaveText = null;
+    }
+
     scene.input.keyboard?.on("keydown-R", this.onRematchKey, this);
     this.drawTimerPill(false);
+  }
+
+  /** Online rematch countdown (3…2…1…0). Null clears. */
+  setCountdown(seconds: number | null): void {
+    this.countdownSeconds = seconds;
+  }
+
+  /** Extra status line for online waiting / reject hints. */
+  setStatusHint(hint: string | null): void {
+    this.statusHint = hint;
   }
 
   playGoalCelebration(): void {
@@ -164,6 +220,7 @@ export class MatchHud {
     this.scene.input.keyboard?.off("keydown-R", this.onRematchKey, this);
     this.celebration.destroy();
     this.rematchText.destroy();
+    this.leaveText?.destroy();
     this.bannerText.destroy();
     this.turnText.destroy();
     this.timerText.destroy();
@@ -183,11 +240,35 @@ export class MatchHud {
     phase: MatchPhase;
     result: MatchResult;
     selectedPuckId?: string | null;
+    awaitingServer?: boolean;
   }): void {
-    const { score, turn, timer, phase, result, selectedPuckId = null } = opts;
+    const {
+      score,
+      turn,
+      timer,
+      phase,
+      result,
+      selectedPuckId = null,
+      awaitingServer = false,
+    } = opts;
 
     this.scoreText.setText(`${score.player1}  —  ${score.player2}`);
     this.setChipActive(turn.current);
+
+    if (this.countdownSeconds !== null) {
+      this.timerText.setText("");
+      this.timerPill.clear();
+      this.turnText.setText("");
+      this.rematchText.setVisible(false);
+      this.leaveText?.setVisible(false);
+      const label =
+        this.countdownSeconds > 0
+          ? String(this.countdownSeconds)
+          : "GO!";
+      this.bannerText.setText(label);
+      this.bannerText.setVisible(true);
+      return;
+    }
 
     if (phase === "MATCH_END") {
       this.timerText.setText("");
@@ -195,10 +276,12 @@ export class MatchHud {
       this.turnText.setText("");
       this.showResult(result);
       this.rematchText.setVisible(true);
+      this.leaveText?.setVisible(true);
       return;
     }
 
     this.rematchText.setVisible(false);
+    this.leaveText?.setVisible(false);
     this.bannerText.setVisible(false);
 
     if (phase === "PLAYER_TURN") {
@@ -211,15 +294,39 @@ export class MatchHud {
       this.drawTimerPill(false);
     }
 
+    if (awaitingServer) {
+      this.turnText.setColor("#94a3b8");
+      this.turnText.setText(this.statusHint ?? "Waiting for server…");
+      return;
+    }
+
     if (phase === "PHYSICS_RESOLUTION") {
       this.turnText.setColor("#94a3b8");
-      this.turnText.setText("Physics resolving…");
+      this.turnText.setText(
+        this.online ? "Replay…" : "Physics resolving…",
+      );
       return;
     }
 
     if (phase === "GOAL_RESOLUTION") {
       this.turnText.setColor("#fbbf24");
       this.turnText.setText("GOAL!!!");
+      return;
+    }
+
+    if (this.online) {
+      const mine = turn.current === this.online.myPlayerId;
+      const p = MATCH_CONFIG.players[turn.current];
+      this.turnText.setColor(phaserColorToCss(p.color));
+      if (mine) {
+        this.turnText.setText(
+          selectedPuckId
+            ? "Selected — drag anywhere"
+            : "Your turn — flick a puck",
+        );
+      } else {
+        this.turnText.setText("Opponent's turn…");
+      }
       return;
     }
 
@@ -286,8 +393,13 @@ export class MatchHud {
 
   private showResult(result: MatchResult): void {
     let msg = "DRAW";
-    if (result === "player1") msg = "PLAYER 1 WINS!";
-    if (result === "player2") msg = "PLAYER 2 WINS!";
+    if (this.online) {
+      if (result === this.online.myPlayerId) msg = "YOU WIN!";
+      else if (result === "player1" || result === "player2") msg = "YOU LOSE";
+    } else {
+      if (result === "player1") msg = "PLAYER 1 WINS!";
+      if (result === "player2") msg = "PLAYER 2 WINS!";
+    }
     this.bannerText.setText(msg);
     this.bannerText.setVisible(true);
   }
