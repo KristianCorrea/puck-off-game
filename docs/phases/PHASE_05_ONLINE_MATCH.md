@@ -1,6 +1,6 @@
 # Phase 5 — Online Match
 
-**Status:** Online vertical slice  
+**Status:** Loop polish in progress (countdown / status / rematch+leave)  
 **Depends on:** Phase 4 (two windows can play)  
 **Unblocks:** Phase 6  
 **Primary owners:** full-stack / gameplay QA
@@ -120,10 +120,12 @@ Also run one own-goal and confirm opponent scored.
 
 ## Definition of Done
 
-- [ ] Full flow works without manual server restarts mid-match
-- [ ] Both clients agree on score, turn, and end result every time
-- [ ] Disconnect mid-flow may still be rough (Phase 6), but happy path is solid
-- [ ] No client-authored score/winner anywhere in the path
+- [x] Full flow works without manual server restarts mid-match
+- [x] Both clients agree on score, turn, and end result every time
+- [x] Disconnect mid-flow may still be rough (Phase 6), but happy path is solid
+- [x] No client-authored score/winner anywhere in the path
+- [x] Shared countdown before match start + rematch
+- [x] Online HUD: your/opponent turn, replay/waiting, YOU WIN/LOSE, rematch + leave
 
 ---
 

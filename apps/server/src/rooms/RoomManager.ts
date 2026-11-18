@@ -21,13 +21,14 @@ type Seat = {
 type Room = {
   code: string;
   seats: { player1: Seat; player2: Seat };
-  phase: "lobby" | "playing" | "ended";
+  phase: "lobby" | "countdown" | "playing" | "ended";
   match: MatchManager;
   /**
    * Don't tick the turn clock / accept launches until clients finish keyframe replay.
    * 0 = unlocked.
    */
   replayUnlockAtMs: number;
+  countdownTimer: ReturnType<typeof setTimeout> | null;
 };
 
 const TICK_MS = 250;
@@ -48,6 +49,7 @@ export class RoomManager {
     if (this.tickTimer) clearInterval(this.tickTimer);
     this.tickTimer = null;
     for (const room of this.rooms.values()) {
+      if (room.countdownTimer) clearTimeout(room.countdownTimer);
       room.match.destroy();
     }
     this.rooms.clear();
@@ -69,6 +71,7 @@ export class RoomManager {
       phase: "lobby",
       match: new MatchManager(),
       replayUnlockAtMs: 0,
+      countdownTimer: null,
     };
     this.rooms.set(code, room);
     this.socketRoom.set(socket.id, code);
@@ -144,15 +147,7 @@ export class RoomManager {
       room.seats.player2.ready;
 
     if (!bothReady) return;
-
-    room.phase = "playing";
-    room.replayUnlockAtMs = 0;
-    const state = room.match.start();
-    this.io.to(room.code).emit(SOCKET_EVENTS.MATCH_START, {
-      code: room.code,
-      state,
-    });
-    this.emitRoomState(room);
+    this.beginCountdown(room);
   }
 
   launch(socket: Socket, payload: LaunchPuckPayload): void {
@@ -214,31 +209,19 @@ export class RoomManager {
       this.emitError(socket, "Not in a room");
       return;
     }
-    if (room.phase !== "ended" && room.phase !== "playing") return;
-
-    // Soft rematch: both must be connected; reset ready in lobby style then start.
-    room.seats.player1.ready = false;
-    room.seats.player2.ready = false;
-    room.phase = "lobby";
-    this.emitRoomState(room);
-
-    // Auto-ready both if still connected (MVP: rematch = immediate restart).
-    if (room.seats.player1.socketId && room.seats.player2.socketId) {
-      room.seats.player1.ready = true;
-      room.seats.player2.ready = true;
-      room.phase = "playing";
-      room.replayUnlockAtMs = 0;
-      const state = room.match.rematch();
-      this.io.to(room.code).emit(SOCKET_EVENTS.MATCH_START, {
-        code: room.code,
-        state,
-      });
-      this.io.to(room.code).emit(
-        SOCKET_EVENTS.TURN_RESOLVED,
-        toTurnResolved(state, "rematch"),
-      );
-      this.emitRoomState(room);
+    if (room.phase !== "ended") return;
+    if (!room.seats.player1.socketId || !room.seats.player2.socketId) {
+      this.emitError(socket, "Both players must be connected to rematch");
+      return;
     }
+
+    room.seats.player1.ready = true;
+    room.seats.player2.ready = true;
+    this.beginCountdown(room, { rematch: true });
+  }
+
+  leave(socket: Socket): void {
+    this.leaveCurrent(socket);
   }
 
   onDisconnect(socket: Socket): void {
@@ -274,6 +257,61 @@ export class RoomManager {
     room.replayUnlockAtMs = Date.now() + replayMs + holdMs;
   }
 
+  private beginCountdown(
+    room: Room,
+    opts?: { rematch?: boolean },
+  ): void {
+    if (room.countdownTimer) {
+      clearTimeout(room.countdownTimer);
+      room.countdownTimer = null;
+    }
+
+    room.phase = "countdown";
+    room.replayUnlockAtMs = Number.MAX_SAFE_INTEGER; // block launches/ticks
+    this.emitRoomState(room);
+
+    let remaining = MATCH_CONFIG.countdownSeconds;
+
+    const tickCountdown = (): void => {
+      if (!this.rooms.has(room.code)) return;
+      if (
+        room.seats.player1.socketId === null ||
+        room.seats.player2.socketId === null
+      ) {
+        room.countdownTimer = null;
+        room.phase = "lobby";
+        room.seats.player1.ready = false;
+        room.seats.player2.ready = false;
+        room.replayUnlockAtMs = 0;
+        this.emitRoomState(room);
+        return;
+      }
+
+      this.io.to(room.code).emit(SOCKET_EVENTS.COUNTDOWN, {
+        code: room.code,
+        seconds: remaining,
+      });
+
+      if (remaining <= 0) {
+        room.countdownTimer = null;
+        room.phase = "playing";
+        room.replayUnlockAtMs = 0;
+        const state = opts?.rematch ? room.match.rematch() : room.match.start();
+        this.io.to(room.code).emit(SOCKET_EVENTS.MATCH_START, {
+          code: room.code,
+          state,
+        });
+        this.emitRoomState(room);
+        return;
+      }
+
+      remaining -= 1;
+      room.countdownTimer = setTimeout(tickCountdown, 1000);
+    };
+
+    tickCountdown();
+  }
+
   private leaveCurrent(socket: Socket): void {
     const code = this.socketRoom.get(socket.id);
     if (!code) return;
@@ -294,16 +332,26 @@ export class RoomManager {
       room.seats.player2.socketId === null;
 
     if (empty) {
+      if (room.countdownTimer) clearTimeout(room.countdownTimer);
       room.match.destroy();
       this.rooms.delete(code);
       return;
     }
 
-    // If someone left mid-match, return to lobby so the remaining player can wait.
-    if (room.phase === "playing" || room.phase === "ended") {
+    // If someone left mid-match / countdown, return to lobby.
+    if (
+      room.phase === "playing" ||
+      room.phase === "ended" ||
+      room.phase === "countdown"
+    ) {
+      if (room.countdownTimer) {
+        clearTimeout(room.countdownTimer);
+        room.countdownTimer = null;
+      }
       room.phase = "lobby";
       room.seats.player1.ready = false;
       room.seats.player2.ready = false;
+      room.replayUnlockAtMs = 0;
       room.match.destroy();
     }
     this.emitRoomState(room);

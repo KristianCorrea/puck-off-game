@@ -4,12 +4,14 @@ import { Match } from "@puck-off/game-engine";
 import {
   MATCH_CONFIG,
   SOCKET_EVENTS,
+  type CountdownPayload,
   type MatchPhase,
   type MatchResult,
   type MatchStartPayload,
   type MatchState,
   type PlayerId,
   type RejectLaunchPayload,
+  type RoomStatePayload,
   type TurnResolvedPayload,
 } from "@puck-off/shared";
 import type { BallEntity } from "../entities/createBall";
@@ -56,6 +58,7 @@ export class OnlineMatchController {
   private pendingAuthority: MatchState | null = null;
   private preShotState: MatchState | null = null;
   private destroyed = false;
+  private readonly onLeave: () => void;
 
   constructor(opts: {
     scene: Phaser.Scene;
@@ -66,6 +69,7 @@ export class OnlineMatchController {
     playerId: PlayerId;
     matchStart: MatchStartPayload;
     onRematch: () => void;
+    onLeave: () => void;
   }) {
     this.scene = opts.scene;
     this.audio = opts.audio;
@@ -73,12 +77,19 @@ export class OnlineMatchController {
     this.ball = opts.ball;
     this.socket = opts.socket;
     this.myPlayerId = opts.playerId;
+    this.onLeave = opts.onLeave;
 
     this.engine = new Match();
     this.engine.start();
     this.engine.adoptState(opts.matchStart.state);
 
-    this.hud = new MatchHud(opts.scene, { onRematch: opts.onRematch });
+    this.hud = new MatchHud(opts.scene, {
+      onRematch: opts.onRematch,
+      online: {
+        myPlayerId: opts.playerId,
+        onLeave: () => this.leave(),
+      },
+    });
     this.fx = new GameFx(opts.scene, {
       pucks: opts.pucks,
       ball: opts.ball,
@@ -142,6 +153,8 @@ export class OnlineMatchController {
     this.socket.off(SOCKET_EVENTS.TURN_RESOLVED, this.onTurnResolved);
     this.socket.off(SOCKET_EVENTS.REJECT_LAUNCH, this.onRejectLaunch);
     this.socket.off(SOCKET_EVENTS.MATCH_START, this.onMatchStart);
+    this.socket.off(SOCKET_EVENTS.COUNTDOWN, this.onCountdown);
+    this.socket.off(SOCKET_EVENTS.ROOM_STATE, this.onRoomState);
     this.socket.off(SOCKET_EVENTS.ERROR, this.onError);
     this.flick.destroy();
     this.hud.destroy();
@@ -158,7 +171,15 @@ export class OnlineMatchController {
     this.replay = null;
     this.pendingAuthority = null;
     this.preShotState = null;
+    this.hud.setStatusHint(null);
     this.socket.emit(SOCKET_EVENTS.REMATCH);
+  }
+
+  leave(): void {
+    if (this.destroyed) return;
+    this.socket.emit(SOCKET_EVENTS.LEAVE_ROOM);
+    this.socket.disconnect();
+    this.onLeave();
   }
 
   update(deltaMs: number): void {
@@ -196,6 +217,8 @@ export class OnlineMatchController {
     this.socket.on(SOCKET_EVENTS.TURN_RESOLVED, this.onTurnResolved);
     this.socket.on(SOCKET_EVENTS.REJECT_LAUNCH, this.onRejectLaunch);
     this.socket.on(SOCKET_EVENTS.MATCH_START, this.onMatchStart);
+    this.socket.on(SOCKET_EVENTS.COUNTDOWN, this.onCountdown);
+    this.socket.on(SOCKET_EVENTS.ROOM_STATE, this.onRoomState);
     this.socket.on(SOCKET_EVENTS.ERROR, this.onError);
   }
 
@@ -238,9 +261,17 @@ export class OnlineMatchController {
     const restore = this.preShotState ?? this.engine.getState();
     this.preShotState = null;
     this.hud.stopGoalCelebration();
+    this.hud.setStatusHint(`Launch rejected (${payload.reason})`);
     this.applyAuthority(restore);
     this.enterPlayerTurnFromState(restore);
     console.warn("[online] launch rejected:", payload.reason);
+  };
+
+  private onCountdown = (payload: CountdownPayload): void => {
+    if (this.destroyed) return;
+    this.flick.setEnabled(false);
+    this.hud.setCountdown(payload.seconds);
+    this.hud.setStatusHint(null);
   };
 
   private onMatchStart = (payload: MatchStartPayload): void => {
@@ -251,12 +282,26 @@ export class OnlineMatchController {
     this.preShotState = null;
     this.goalPauseMs = 0;
     this.turnAnnounce = false;
+    this.hud.setCountdown(null);
+    this.hud.setStatusHint(null);
     this.hud.stopGoalCelebration();
     this.applyAuthority(payload.state);
     this.enterPlayerTurnFromState(payload.state);
   };
 
+  private onRoomState = (payload: RoomStatePayload): void => {
+    if (this.destroyed) return;
+    // Opponent left mid-match / countdown — bounce out of the session.
+    if (payload.phase === "lobby") {
+      this.hud.setStatusHint("Opponent left");
+      this.leave();
+    }
+  };
+
   private onError = (payload: { message?: string }): void => {
+    if (!this.destroyed) {
+      this.hud.setStatusHint(payload?.message ?? "Server error");
+    }
     console.warn("[online]", payload?.message ?? "error");
   };
 
@@ -418,6 +463,7 @@ export class OnlineMatchController {
       phase: this.phase,
       result: this.result,
       selectedPuckId: this.flick.selectedPuckId,
+      awaitingServer: this.awaitingResolve && !this.replay,
     });
     highlightActivePucks(
       this.pucks,

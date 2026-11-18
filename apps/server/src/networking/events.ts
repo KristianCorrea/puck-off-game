@@ -29,6 +29,10 @@ export function bindSocketHandlers(io: Server, rooms: RoomManager): void {
       rooms.rematch(socket);
     });
 
+    socket.on(SOCKET_EVENTS.LEAVE_ROOM, () => {
+      rooms.leave(socket);
+    });
+
     socket.on("disconnect", () => {
       rooms.onDisconnect(socket);
     });

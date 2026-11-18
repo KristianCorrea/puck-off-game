@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io-client";
 import {
   SOCKET_EVENTS,
+  type CountdownPayload,
   type MatchStartPayload,
   type PlayerId,
   type RoomCreatedPayload,
@@ -16,19 +17,21 @@ export type OnlineLobbyResult = {
 };
 
 /**
- * Minimal DOM lobby: create / join / ready. Resolves when MATCH_START fires.
+ * Minimal DOM lobby: create / join / ready / countdown. Resolves on MATCH_START.
  */
 export function runOnlineLobby(): Promise<OnlineLobbyResult> {
   return new Promise((resolve, reject) => {
     const root = document.getElementById("online-lobby");
     const statusEl = document.getElementById("lobby-status");
     const codeEl = document.getElementById("lobby-code");
+    const countdownEl = document.getElementById("lobby-countdown");
     const joinInput = document.getElementById(
       "lobby-join-input",
     ) as HTMLInputElement | null;
     const createBtn = document.getElementById("lobby-create-btn");
     const joinBtn = document.getElementById("lobby-join-btn");
     const readyBtn = document.getElementById("lobby-ready-btn");
+    const leaveBtn = document.getElementById("lobby-leave-btn");
     const serverEl = document.getElementById("lobby-server");
 
     if (!root) {
@@ -40,10 +43,34 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       if (statusEl) statusEl.textContent = msg;
     };
 
+    const setCountdown = (seconds: number | null): void => {
+      if (!countdownEl) return;
+      if (seconds === null) {
+        countdownEl.textContent = "";
+        countdownEl.classList.remove("is-visible");
+        return;
+      }
+      countdownEl.textContent = seconds > 0 ? String(seconds) : "GO";
+      countdownEl.classList.add("is-visible");
+    };
+
+    const setLobbyControlsEnabled = (enabled: boolean): void => {
+      if (enabled) {
+        createBtn?.removeAttribute("disabled");
+        joinBtn?.removeAttribute("disabled");
+        joinInput?.removeAttribute("disabled");
+      } else {
+        createBtn?.setAttribute("disabled", "true");
+        joinBtn?.setAttribute("disabled", "true");
+        joinInput?.setAttribute("disabled", "true");
+      }
+    };
+
     root.classList.add("is-visible");
     root.setAttribute("aria-hidden", "false");
     if (serverEl) serverEl.textContent = getServerUrl();
     setStatus("Connecting…");
+    setCountdown(null);
 
     const socket = connectSocket();
     let myPlayerId: PlayerId | null = null;
@@ -53,6 +80,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     const cleanupUi = (): void => {
       root.classList.remove("is-visible");
       root.setAttribute("aria-hidden", "true");
+      setCountdown(null);
     };
 
     const fail = (message: string): void => {
@@ -78,6 +106,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       if (codeEl) codeEl.textContent = payload.code;
       setStatus(`Room ${payload.code} — waiting for opponent, then Ready.`);
       readyBtn?.removeAttribute("disabled");
+      leaveBtn?.removeAttribute("disabled");
     });
 
     socket.on(SOCKET_EVENTS.ROOM_STATE, (payload: RoomStatePayload) => {
@@ -86,10 +115,36 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       if (codeEl) codeEl.textContent = payload.code;
       const p1 = payload.players.find((p) => p.playerId === "player1");
       const p2 = payload.players.find((p) => p.playerId === "player2");
+      const seatLine = `P1 ${p1?.connected ? (p1.ready ? "ready" : "in") : "—"} · P2 ${p2?.connected ? (p2.ready ? "ready" : "in") : "—"}`;
+
+      if (payload.phase === "countdown") {
+        setLobbyControlsEnabled(false);
+        readyBtn?.setAttribute("disabled", "true");
+        setStatus(`${payload.code} · starting…`);
+        return;
+      }
+
+      if (payload.phase === "lobby") {
+        setCountdown(null);
+        setLobbyControlsEnabled(true);
+        readyBtn?.removeAttribute("disabled");
+        leaveBtn?.removeAttribute("disabled");
+        setStatus(`${payload.code} · ${seatLine}`);
+        return;
+      }
+
+      setStatus(`${payload.code} · ${seatLine}`);
+    });
+
+    socket.on(SOCKET_EVENTS.COUNTDOWN, (payload: CountdownPayload) => {
+      setLobbyControlsEnabled(false);
+      readyBtn?.setAttribute("disabled", "true");
+      setCountdown(payload.seconds);
       setStatus(
-        `${payload.code} · P1 ${p1?.connected ? (p1.ready ? "ready" : "in") : "—"} · P2 ${p2?.connected ? (p2.ready ? "ready" : "in") : "—"}`,
+        payload.seconds > 0
+          ? `Match starts in ${payload.seconds}…`
+          : "Match starting!",
       );
-      if (payload.phase === "lobby") readyBtn?.removeAttribute("disabled");
     });
 
     socket.on(SOCKET_EVENTS.MATCH_START, (payload: MatchStartPayload) => {
@@ -122,6 +177,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       socket.emit(SOCKET_EVENTS.JOIN_ROOM, { code });
       setStatus(`Joining ${code.toUpperCase()}…`);
       readyBtn?.removeAttribute("disabled");
+      leaveBtn?.removeAttribute("disabled");
     });
 
     readyBtn?.addEventListener("click", (e) => {
@@ -131,6 +187,17 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       setStatus("Ready — waiting for both players…");
     });
 
+    leaveBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (settled) return;
+      socket.emit(SOCKET_EVENTS.LEAVE_ROOM);
+      socket.disconnect();
+      sessionStorage.removeItem("puckoff-play-mode");
+      window.location.assign(window.location.pathname);
+    });
+
     readyBtn?.setAttribute("disabled", "true");
+    leaveBtn?.setAttribute("disabled", "true");
   });
 }

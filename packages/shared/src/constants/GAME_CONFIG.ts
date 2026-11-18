@@ -71,6 +71,8 @@ export const MATCH_CONFIG = {
   settleMaxMs: 10_000,
   /** Client celebration hold; engine waits in GOAL_RESOLUTION then resets. */
   goalCelebrationMs: 5_000,
+  /** Shared 3-2-1 before MATCH_START (online). */
+  countdownSeconds: 3,
   goalEjectFieldRatio: 0.187,
   /** Fixed Matter step for headless sim (ms). */
   fixedStepMs: 1000 / 60,

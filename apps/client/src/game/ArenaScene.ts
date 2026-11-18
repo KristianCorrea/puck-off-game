@@ -120,6 +120,7 @@ export class ArenaScene extends Phaser.Scene {
         playerId: lobby.playerId,
         matchStart: lobby.matchStart,
         onRematch: () => this.queueRematch(),
+        onLeave: () => this.leaveOnline(),
       });
     } catch (err) {
       console.error("[online] lobby failed", err);
@@ -138,5 +139,12 @@ export class ArenaScene extends Phaser.Scene {
       this.match?.rematch();
       this.rematchQueued = false;
     });
+  }
+
+  private leaveOnline(): void {
+    this.match?.destroy();
+    this.match = null;
+    sessionStorage.removeItem("puckoff-play-mode");
+    window.location.assign(window.location.pathname);
   }
 }
