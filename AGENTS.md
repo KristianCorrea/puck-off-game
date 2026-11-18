@@ -32,8 +32,8 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 | Pucks in pocket | Eject onto pitch at end of turn |
 | Win | First to **3** (no match-duration clock) |
 | Turn timer | ~20s; expiry **skips** turn |
-| Net feel | Shooter: render local/server engine steps; opponent: wait for `TURN_RESOLVED` |
-| Authority | `game-engine` Matter = truth; Phaser paints engine state (no second sim) |
+| Net feel | Both clients replay server keyframes from `TURN_RESOLVED` |
+| Authority | `game-engine` Matter = truth; Phaser paints keyframes / finals (no second sim) |
 
 ## Stack (MVP)
 

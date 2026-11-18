@@ -17,6 +17,7 @@ import type { GameAudio } from "../audio/GameAudio";
 import type { PuckEntity } from "../entities/createPuck";
 import { GameFx } from "../fx/GameFx";
 import { FlickController } from "../input/FlickController";
+import { KeyframeReplay } from "./KeyframeReplay";
 import { MatchHud, highlightActivePucks } from "./MatchHud";
 import { MatchTimer } from "./MatchTimer";
 import { ScoreKeeper } from "./ScoreKeeper";
@@ -25,8 +26,7 @@ import { paintMatchState } from "./paintMatchState";
 
 /**
  * Online session: server Match is authority.
- * Shooter steps a local Match copy for snappy feel, then reconciles on TURN_RESOLVED.
- * Opponent waits and paints TURN_RESOLVED (no second Matter world).
+ * Shots replay server keyframes (no competing client Matter path).
  */
 export class OnlineMatchController {
   phase: MatchPhase = "PLAYER_TURN";
@@ -49,11 +49,9 @@ export class OnlineMatchController {
 
   private goalPauseMs = 0;
   private turnAnnounce = false;
-  /** Local prediction in progress (we are the shooter). */
-  private predicting = false;
-  /** Local anim done; waiting for TURN_RESOLVED. */
-  private awaitingServer = false;
-  private pendingServer: MatchState | null = null;
+  /** Waiting for TURN_RESOLVED after we launched. */
+  private awaitingResolve = false;
+  private replay: KeyframeReplay | null = null;
   private preShotState: MatchState | null = null;
   private destroyed = false;
 
@@ -115,24 +113,12 @@ export class OnlineMatchController {
         );
 
         this.preShotState = this.engine.getState();
-        const started = this.engine.applyAction({
-          playerId: this.myPlayerId,
-          puckId: puck.id,
-          angle: shot.angle,
-          power: shot.power,
-        });
-        if (!started.ok) {
-          this.preShotState = null;
-          return;
-        }
-
-        this.predicting = true;
-        this.awaitingServer = false;
-        this.pendingServer = null;
-        this.fx.resetMotionTracking();
-        this.syncFromState(started.state, { paintBodies: true });
+        this.awaitingResolve = true;
+        this.replay = null;
+        this.phase = "PHYSICS_RESOLUTION";
         this.timer.stop();
         this.flick.setEnabled(false);
+        this.fx.resetMotionTracking();
 
         this.socket.emit(SOCKET_EVENTS.LAUNCH_PUCK, {
           puckId: puck.id,
@@ -166,9 +152,8 @@ export class OnlineMatchController {
     this.fx.hideCharge();
     this.flick.setEnabled(false);
     this.goalPauseMs = 0;
-    this.predicting = false;
-    this.awaitingServer = false;
-    this.pendingServer = null;
+    this.awaitingResolve = false;
+    this.replay = null;
     this.preShotState = null;
     this.socket.emit(SOCKET_EVENTS.REMATCH);
   }
@@ -177,13 +162,17 @@ export class OnlineMatchController {
     if (this.destroyed) return;
     this.fx.update(deltaMs);
 
-    if (this.phase === "PLAYER_TURN" && !this.predicting && !this.awaitingServer) {
+    if (
+      this.phase === "PLAYER_TURN" &&
+      !this.awaitingResolve &&
+      !this.replay
+    ) {
       this.timer.remainingMs = Math.max(0, this.timer.remainingMs - deltaMs);
       this.timer.running = true;
     }
 
-    if (this.predicting && this.phase === "PHYSICS_RESOLUTION") {
-      this.updateLocalPrediction(deltaMs);
+    if (this.replay) {
+      this.updateReplay(deltaMs);
     } else if (this.phase === "GOAL_RESOLUTION") {
       this.updateGoalCelebration(deltaMs);
     }
@@ -194,8 +183,8 @@ export class OnlineMatchController {
   private canFlick(): boolean {
     return (
       this.phase === "PLAYER_TURN" &&
-      !this.predicting &&
-      !this.awaitingServer &&
+      !this.awaitingResolve &&
+      !this.replay &&
       this.turns.current === this.myPlayerId
     );
   }
@@ -209,55 +198,39 @@ export class OnlineMatchController {
 
   private onTurnResolved = (payload: TurnResolvedPayload): void => {
     if (this.destroyed) return;
-    const state = payload.state;
-
-    if (this.predicting || this.awaitingServer) {
-      this.pendingServer = state;
-      if (!this.predicting) {
-        this.applyAuthority(state);
-        if (state.phase === "MATCH_END") {
-          this.audio.playWin();
-          this.flick.setEnabled(false);
-          return;
-        }
-        this.enterPlayerTurnFromState(state);
-      }
-      return;
-    }
-
-    const scored =
-      state.score.player1 !== this.score.player1 ||
-      state.score.player2 !== this.score.player2;
 
     if (payload.reason === "timeout") {
       this.audio.playTimeout();
     }
 
-    this.applyAuthority(state);
+    this.awaitingResolve = false;
+    this.preShotState = null;
 
-    if (scored && state.phase !== "MATCH_END") {
-      this.audio.playGoal();
-      this.hud.playGoalCelebration();
-      this.goalPauseMs = Math.min(1200, MATCH_CONFIG.goalCelebrationMs);
-      this.phase = "GOAL_RESOLUTION";
+    const frames = payload.keyframes ?? [];
+    if (payload.reason === "launch" && frames.length > 0) {
+      this.fx.resetMotionTracking();
+      this.replay = new KeyframeReplay(frames, payload.state);
+      this.phase = "PHYSICS_RESOLUTION";
+      this.timer.stop();
       this.flick.setEnabled(false);
+      // Seed first pose immediately.
+      this.updateReplay(0);
       return;
     }
 
-    if (state.phase === "MATCH_END") {
-      this.audio.playWin();
-      this.flick.setEnabled(false);
-      return;
-    }
-
-    this.enterPlayerTurnFromState(state);
+    // Timeout / rematch / empty keyframes — snap.
+    this.finishWithAuthority(payload.state, {
+      scored:
+        payload.state.score.player1 !== this.score.player1 ||
+        payload.state.score.player2 !== this.score.player2,
+      briefGoalFx: true,
+    });
   };
 
   private onRejectLaunch = (payload: RejectLaunchPayload): void => {
     if (this.destroyed) return;
-    this.predicting = false;
-    this.awaitingServer = false;
-    this.pendingServer = null;
+    this.awaitingResolve = false;
+    this.replay = null;
     const restore = this.preShotState ?? this.engine.getState();
     this.preShotState = null;
     this.hud.stopGoalCelebration();
@@ -268,9 +241,8 @@ export class OnlineMatchController {
 
   private onMatchStart = (payload: MatchStartPayload): void => {
     if (this.destroyed) return;
-    this.predicting = false;
-    this.awaitingServer = false;
-    this.pendingServer = null;
+    this.awaitingResolve = false;
+    this.replay = null;
     this.preShotState = null;
     this.goalPauseMs = 0;
     this.turnAnnounce = false;
@@ -283,42 +255,87 @@ export class OnlineMatchController {
     console.warn("[online]", payload?.message ?? "error");
   };
 
-  private updateLocalPrediction(deltaMs: number): void {
-    const stepped = this.engine.step(deltaMs);
-    this.syncFromState(stepped.state, { paintBodies: true });
+  private updateReplay(deltaMs: number): void {
+    if (!this.replay) return;
 
-    if (!stepped.shotComplete) return;
-
-    if (stepped.events.some((e) => e.type === "goal")) {
-      this.beginGoalCelebration();
+    const pose = this.replay.update(deltaMs);
+    if (pose) {
+      this.paintReplayPose(pose);
+      this.phase = pose.goal ? "GOAL_RESOLUTION" : "PHYSICS_RESOLUTION";
       return;
     }
 
-    this.endLocalPrediction();
+    // Replay finished.
+    const scored = this.replay.scoredDuringReplay;
+    const state = this.replay.authority;
+    this.replay = null;
+    this.finishWithAuthority(state, { scored, briefGoalFx: scored });
   }
 
-  private beginGoalCelebration(): void {
-    this.phase = "GOAL_RESOLUTION";
-    this.goalPauseMs = MATCH_CONFIG.goalCelebrationMs;
-    this.audio.playGoal();
-    this.hud.playGoalCelebration();
+  private paintReplayPose(pose: {
+    ball: { x: number; y: number; vx: number; vy: number };
+    pucks: Array<{
+      id: string;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+    }>;
+  }): void {
+    const synth: MatchState = {
+      ...this.engine.getState(),
+      phase: "PHYSICS_RESOLUTION",
+      ball: {
+        id: "ball",
+        position: { x: pose.ball.x, y: pose.ball.y },
+        velocity: { x: pose.ball.vx, y: pose.ball.vy },
+        angularVelocity: 0,
+      },
+      pucks: pose.pucks.map((p) => {
+        const prev = this.engine.getState().pucks.find((x) => x.id === p.id);
+        return {
+          id: p.id,
+          ownerId: prev?.ownerId ?? "player1",
+          spawn: prev?.spawn ?? { x: p.x, y: p.y },
+          position: { x: p.x, y: p.y },
+          velocity: { x: p.vx, y: p.vy },
+          angularVelocity: 0,
+        };
+      }),
+    };
+    paintMatchState(this.scene, synth, this.ball, this.pucks, this.fx);
+  }
+
+  private finishWithAuthority(
+    state: MatchState,
+    opts: { scored: boolean; briefGoalFx: boolean },
+  ): void {
+    this.applyAuthority(state);
+
+    if (opts.scored && opts.briefGoalFx && state.phase !== "MATCH_END") {
+      this.audio.playGoal();
+      this.hud.playGoalCelebration();
+      this.goalPauseMs = Math.min(1200, MATCH_CONFIG.goalCelebrationMs);
+      this.phase = "GOAL_RESOLUTION";
+      this.flick.setEnabled(false);
+      return;
+    }
+
+    if (state.phase === "MATCH_END") {
+      if (opts.scored) this.audio.playGoal();
+      this.audio.playWin();
+      this.flick.setEnabled(false);
+      return;
+    }
+
+    this.enterPlayerTurnFromState(state);
   }
 
   private updateGoalCelebration(deltaMs: number): void {
-    if (this.predicting) {
-      const stepped = this.engine.step(deltaMs);
-      this.syncFromState(stepped.state, { paintBodies: true });
-    }
-
     this.goalPauseMs -= deltaMs;
     if (this.goalPauseMs > 0) return;
 
     this.hud.stopGoalCelebration();
-    if (this.predicting) {
-      this.endLocalPrediction();
-      return;
-    }
-
     const state = this.engine.getState();
     if (state.phase === "MATCH_END") {
       this.audio.playWin();
@@ -328,33 +345,9 @@ export class OnlineMatchController {
     this.enterPlayerTurnFromState(state);
   }
 
-  private endLocalPrediction(): void {
-    this.predicting = false;
-    this.preShotState = null;
-
-    // Capture before applyAuthority — it clears this.pendingServer.
-    const state = this.pendingServer;
-    if (state) {
-      this.applyAuthority(state);
-
-      if (state.phase === "MATCH_END") {
-        this.audio.playWin();
-        this.flick.setEnabled(false);
-        return;
-      }
-      this.enterPlayerTurnFromState(state);
-      return;
-    }
-
-    // Local finished first — hold until TURN_RESOLVED.
-    this.awaitingServer = true;
-    this.phase = "PHYSICS_RESOLUTION";
-    this.flick.setEnabled(false);
-  }
-
   private applyAuthority(state: MatchState): void {
-    this.awaitingServer = false;
-    this.pendingServer = null;
+    this.awaitingResolve = false;
+    this.replay = null;
     this.engine.adoptState(state);
     this.syncFromState(state, { paintBodies: true });
   }

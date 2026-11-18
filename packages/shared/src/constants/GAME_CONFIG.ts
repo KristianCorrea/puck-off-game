@@ -74,6 +74,11 @@ export const MATCH_CONFIG = {
   goalEjectFieldRatio: 0.187,
   /** Fixed Matter step for headless sim (ms). */
   fixedStepMs: 1000 / 60,
+  /**
+   * Record a replay pose every N fixed steps (~30Hz when 2 @ 60Hz).
+   * Keeps TURN_RESOLVED payloads small while staying smooth.
+   */
+  keyframeEverySteps: 2,
   players: {
     player1: {
       id: "player1" as const,

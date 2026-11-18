@@ -1,6 +1,6 @@
 # Phase 4 — Multiplayer Server
 
-**Status:** In progress — server + client online session (minimal lobby); polish / two-window DoD next  
+**Status:** In progress — server + client online; TURN_RESOLVED includes keyframe replay  
 **Depends on:** Phase 3 (`game-engine` + `shared`)  
 **Unblocks:** Phase 5  
 **Primary owners:** backend / netcode
@@ -24,9 +24,9 @@ Milestone:
 - Server runs `game-engine` (authoritative Matter, fixed timestep)
 - Client sends `LAUNCH_PUCK` intent only
 - Server broadcasts `TURN_RESOLVED`
-- Shooter: step a **local engine copy** (or replay) for immediate motion; reconcile to server result
+- Both clients **replay server keyframes** from `TURN_RESOLVED` (no competing Matter prediction)
 - Opponent: waits for `TURN_RESOLVED` (no `LAUNCH_CONFIRMED` in MVP)
-- **No second Matter world** — Phaser paints engine / resolved state only (same as Phase 3 local)
+- **No second Matter world** — Phaser paints keyframes / final state only
 
 ---
 
@@ -102,15 +102,14 @@ Do **not** stream per-frame physics over the wire.
 ## Client feel (locked)
 
 ```text
-Shooter:  release → applyAction on local Match copy + step/paint + LAUNCH_PUCK
-Server:   validate → simulate (same Match API) → TURN_RESOLVED
-Opponent: idle until TURN_RESOLVED → apply/paint result
-Shooter:  TURN_RESOLVED → snap/correct to server finals if needed
+Shooter:  release → LAUNCH_PUCK (+ flick VFX)
+Server:   validate → simulate + record keyframes → TURN_RESOLVED
+Both:     replay keyframes → adopt final state
 ```
 
-If launch rejected: stop local playback, restore pre-shot engine/view state.
+If launch rejected: restore pre-shot view state.
 
-“Optimistic” here means **immediate local engine steps**, not a separate Phaser Matter sim racing the server.
+Do **not** run a second Matter sim for online prediction — keyframes are the shared visual truth.
 
 ---
 

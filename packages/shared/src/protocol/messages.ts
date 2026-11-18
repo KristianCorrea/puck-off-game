@@ -4,6 +4,7 @@
  */
 import type { MatchPhase, MatchResult, PlayerId } from "../types/MatchPhase";
 import type { MatchState } from "../types/MatchState";
+import type { PhysicsKeyframe } from "../types/PhysicsKeyframe";
 
 /** Socket.IO event names (client ↔ server). */
 export const SOCKET_EVENTS = {
@@ -93,6 +94,13 @@ export type TurnResolvedPayload = {
   remainingTimeMs: number;
   /** Why this resolve happened */
   reason: "launch" | "timeout" | "rematch";
+  /**
+   * Server-authored shot path for both clients to replay.
+   * Empty for timeout/rematch (snap to `state` only).
+   */
+  keyframes?: PhysicsKeyframe[];
+  /** Duration each keyframe interval represents (ms). */
+  keyframeDtMs?: number;
 };
 
 export type RejectLaunchPayload = {

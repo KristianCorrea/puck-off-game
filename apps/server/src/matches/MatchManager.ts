@@ -1,13 +1,15 @@
 import { Match } from "@puck-off/game-engine";
 import {
+  MATCH_CONFIG,
   type LaunchAction,
   type MatchState,
+  type PhysicsKeyframe,
   type TurnResolvedPayload,
 } from "@puck-off/shared";
 
 /**
  * Wraps one authoritative Match for a room.
- * Settles shots in-process (no per-frame socket spam).
+ * Settles shots in-process and attaches keyframes for client replay.
  */
 export class MatchManager {
   private match: Match | null = null;
@@ -39,7 +41,7 @@ export class MatchManager {
   }
 
   /**
-   * Apply launch intent and settle to finals.
+   * Apply launch intent and settle to finals + keyframes.
    * Goals auto-complete via Match.settle() (no celebration wait on server).
    */
   applyLaunch(action: LaunchAction):
@@ -57,7 +59,7 @@ export class MatchManager {
     const settled = this.match.settle();
     return {
       ok: true,
-      payload: toTurnResolved(settled.state, "launch"),
+      payload: toTurnResolved(settled.state, "launch", settled.keyframes),
     };
   }
 
@@ -71,7 +73,9 @@ export class MatchManager {
 export function toTurnResolved(
   state: MatchState,
   reason: TurnResolvedPayload["reason"],
+  keyframes: PhysicsKeyframe[] = [],
 ): TurnResolvedPayload {
+  const every = Math.max(1, MATCH_CONFIG.keyframeEverySteps);
   return {
     state,
     score: { ...state.score },
@@ -80,5 +84,7 @@ export function toTurnResolved(
     winner: state.result,
     remainingTimeMs: state.turnRemainingMs,
     reason,
+    keyframes,
+    keyframeDtMs: MATCH_CONFIG.fixedStepMs * every,
   };
 }

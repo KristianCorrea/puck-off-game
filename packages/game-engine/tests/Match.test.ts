@@ -84,6 +84,8 @@ describe("Match engine", () => {
       expect(result.state.phase).toBe("PLAYER_TURN");
       expect(result.state.currentTurn).toBe("player2");
       expect(result.events.some((e) => e.type === "turn_advanced")).toBe(true);
+      expect(result.keyframes.length).toBeGreaterThan(1);
+      expect(result.keyframes[0]!.atMs).toBe(0);
     }
     match.destroy();
   });

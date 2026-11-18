@@ -9,6 +9,7 @@ import {
   type MatchPhase,
   type MatchResult,
   type MatchState,
+  type PhysicsKeyframe,
   type PlayerId,
 } from "@puck-off/shared";
 import { pointInGoalSide } from "./entities/goalZones";
@@ -27,6 +28,15 @@ export type MatchEvent =
 export type ApplyActionResult =
   | { ok: true; state: MatchState; events: MatchEvent[] }
   | { ok: false; reason: string; state: MatchState };
+
+export type SettleResult =
+  | {
+      ok: true;
+      state: MatchState;
+      events: MatchEvent[];
+      keyframes: PhysicsKeyframe[];
+    }
+  | { ok: false; reason: string; state: MatchState; keyframes: [] };
 
 export type StepResult = {
   state: MatchState;
@@ -273,18 +283,35 @@ export class Match {
 
   /**
    * Run physics to completion (tests / server batch). Auto-completes goals.
+   * Records compact keyframes for client replay (online).
    */
-  settle(): ApplyActionResult {
+  settle(): SettleResult {
     if (this.phase !== "PHYSICS_RESOLUTION" && this.phase !== "GOAL_RESOLUTION") {
-      return { ok: true, state: this.getState(), events: [] };
+      return { ok: true, state: this.getState(), events: [], keyframes: [] };
     }
 
     const events: MatchEvent[] = [];
     const stepMs = MATCH_CONFIG.fixedStepMs;
+    const every = Math.max(1, MATCH_CONFIG.keyframeEverySteps);
+    const keyframes: PhysicsKeyframe[] = [];
+    let steps = 0;
+
+    const record = (opts?: { goal?: boolean }): void => {
+      keyframes.push(this.captureKeyframe(steps * stepMs, opts));
+    };
+
+    // Pose right after impulse (shot start).
+    record();
 
     while (this.phase === "PHYSICS_RESOLUTION") {
       const r = this.step(stepMs);
+      steps += 1;
       events.push(...r.events);
+
+      const scored = r.events.some((e) => e.type === "goal");
+      if (scored || steps % every === 0 || r.shotComplete) {
+        record({ goal: scored || undefined });
+      }
     }
 
     if (this.phase === "GOAL_RESOLUTION") {
@@ -300,7 +327,24 @@ export class Match {
       }
     }
 
-    return { ok: true, state: this.getState(), events };
+    return { ok: true, state: this.getState(), events, keyframes };
+  }
+
+  private captureKeyframe(
+    atMs: number,
+    opts?: { goal?: boolean },
+  ): PhysicsKeyframe {
+    const world = this.requireWorld();
+    return {
+      atMs,
+      ball: { x: world.ball.position.x, y: world.ball.position.y },
+      pucks: world.pucks.map((p) => ({
+        id: p.id,
+        x: p.body.position.x,
+        y: p.body.position.y,
+      })),
+      ...(opts?.goal ? { goal: true } : {}),
+    };
   }
 
   private advanceTurn(): void {

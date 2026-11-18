@@ -1,5 +1,10 @@
 export { Match } from "./Match";
-export type { ApplyActionResult, MatchEvent, StepResult } from "./Match";
+export type {
+  ApplyActionResult,
+  MatchEvent,
+  SettleResult,
+  StepResult,
+} from "./Match";
 export { MatterWorld } from "./physics/MatterWorld";
 export { getDefenseLayout } from "./layouts/defenseLayout";
 export { validateLaunch, hasWinner, clampPower } from "./GameRules";
