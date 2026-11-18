@@ -39,7 +39,13 @@ export class KeyframeReplay {
     return this.finalState;
   }
 
-  /** Advance clock; returns pose to paint (null if finished — use authority). */
+  /** Last recorded pose (ball-in-net on goals) — freeze here during celebration. */
+  getFreezePose(): ReplayPose {
+    const last = this.frames[this.frames.length - 1]!;
+    return poseFromKeyframe(last);
+  }
+
+  /** Advance clock; returns pose to paint (null if finished). */
   update(deltaMs: number): ReplayPose | null {
     if (this.done) return null;
 
@@ -86,6 +92,20 @@ export class KeyframeReplay {
       goal: Boolean(a.goal || b.goal),
     };
   }
+}
+
+function poseFromKeyframe(frame: PhysicsKeyframe): ReplayPose {
+  return {
+    ball: { x: frame.ball.x, y: frame.ball.y, vx: 0, vy: 0 },
+    pucks: frame.pucks.map((p) => ({
+      id: p.id,
+      x: p.x,
+      y: p.y,
+      vx: 0,
+      vy: 0,
+    })),
+    goal: Boolean(frame.goal),
+  };
 }
 
 function lerp(a: number, b: number, t: number): number {
