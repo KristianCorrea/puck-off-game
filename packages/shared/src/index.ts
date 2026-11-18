@@ -29,8 +29,23 @@ export type {
   MatchState,
 } from "./types/MatchState";
 
-export type {
-  LaunchPuckMessage,
-  TurnResolvedMessage,
-  RejectLaunchMessage,
+export {
+  SOCKET_EVENTS,
+  type SocketEventName,
+  type CreateRoomPayload,
+  type JoinRoomPayload,
+  type ReadyPayload,
+  type LaunchPuckPayload,
+  type RematchPayload,
+  type RoomCreatedPayload,
+  type RoomPlayerInfo,
+  type RoomStatePayload,
+  type PlayerJoinedPayload,
+  type MatchStartPayload,
+  type TurnResolvedPayload,
+  type RejectLaunchPayload,
+  type ErrorPayload,
+  type LaunchPuckMessage,
+  type TurnResolvedMessage,
+  type RejectLaunchMessage,
 } from "./protocol/messages";

@@ -7,10 +7,12 @@
   ],
   "scripts": {
     "dev": "npm run dev -w @puck-off/client",
+    "dev:server": "npm run dev -w @puck-off/server",
+    "dev:client": "npm run dev -w @puck-off/client",
     "build": "npm run build -w @puck-off/client",
     "preview": "npm run preview -w @puck-off/client",
     "test": "npm run test -w @puck-off/game-engine",
-    "typecheck": "npm run typecheck -w @puck-off/shared && npm run typecheck -w @puck-off/game-engine && npm run build -w @puck-off/client --if-present"
+    "typecheck": "npm run typecheck -w @puck-off/shared && npm run typecheck -w @puck-off/game-engine && npm run typecheck -w @puck-off/server && npm run build -w @puck-off/client --if-present"
   },
   "engines": {
     "node": ">=20"
