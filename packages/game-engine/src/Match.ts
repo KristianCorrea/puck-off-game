@@ -104,6 +104,36 @@ export class Match {
   }
 
   /**
+   * Reconcile to an authoritative snapshot (online TURN_RESOLVED / MATCH_START).
+   * Overwrites rules fields and body transforms; resets physics counters.
+   */
+  adoptState(state: MatchState): MatchState {
+    const world = this.requireWorld();
+    this.phase = state.phase;
+    this.result = state.result;
+    this.currentTurn = state.currentTurn;
+    this.turnRemainingMs = state.turnRemainingMs;
+    this.score = { ...state.score };
+    this.resetPhysicsCounters();
+
+    Body.setPosition(world.ball, { ...state.ball.position });
+    Body.setVelocity(world.ball, { ...state.ball.velocity });
+    Body.setAngularVelocity(world.ball, state.ball.angularVelocity);
+
+    for (const puckState of state.pucks) {
+      const puck = world.getPuck(puckState.id);
+      if (!puck) continue;
+      puck.spawnX = puckState.spawn.x;
+      puck.spawnY = puckState.spawn.y;
+      Body.setPosition(puck.body, { ...puckState.position });
+      Body.setVelocity(puck.body, { ...puckState.velocity });
+      Body.setAngularVelocity(puck.body, puckState.angularVelocity);
+    }
+
+    return this.getState();
+  }
+
+  /**
    * Advance turn clock while in PLAYER_TURN.
    * @returns true if the turn was skipped due to expiry
    */

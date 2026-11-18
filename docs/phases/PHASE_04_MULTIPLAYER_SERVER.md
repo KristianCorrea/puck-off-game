@@ -1,6 +1,6 @@
 # Phase 4 — Multiplayer Server
 
-**Status:** In progress — `apps/server` boots (rooms + Match authority); client net UI not wired yet  
+**Status:** In progress — server + client online session (minimal lobby); polish / two-window DoD next  
 **Depends on:** Phase 3 (`game-engine` + `shared`)  
 **Unblocks:** Phase 5  
 **Primary owners:** backend / netcode

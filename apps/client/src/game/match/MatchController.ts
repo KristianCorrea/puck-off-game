@@ -15,6 +15,7 @@ import { MatchHud, highlightActivePucks } from "./MatchHud";
 import { MatchTimer } from "./MatchTimer";
 import { ScoreKeeper } from "./ScoreKeeper";
 import { TurnManager } from "./TurnManager";
+import { paintMatchState } from "./paintMatchState";
 
 /**
  * Local hot-seat: one Match engine owns physics; Phaser only paints + input.
@@ -226,54 +227,7 @@ export class MatchController {
   }
 
   private paintBodiesFromEngine(state: MatchState): void {
-    const matter = this.scene.matter;
-
-    // autoUpdate is off — set body + sprite; Phaser won't sync them for us.
-    matter.body.setPosition(this.ball.body, state.ball.position);
-    matter.body.setVelocity(this.ball.body, state.ball.velocity);
-    matter.body.setAngularVelocity(this.ball.body, state.ball.angularVelocity);
-    this.ball.sprite.setPosition(state.ball.position.x, state.ball.position.y);
-
-    const samples: {
-      id: string;
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-    }[] = [
-      {
-        id: "ball",
-        x: state.ball.position.x,
-        y: state.ball.position.y,
-        vx: state.ball.velocity.x,
-        vy: state.ball.velocity.y,
-      },
-    ];
-
-    for (const puckState of state.pucks) {
-      const puck = this.pucks.find((p) => p.id === puckState.id);
-      if (!puck) continue;
-      matter.body.setPosition(puck.body, puckState.position);
-      matter.body.setVelocity(puck.body, puckState.velocity);
-      matter.body.setAngularVelocity(puck.body, puckState.angularVelocity);
-      puck.sprite.setPosition(puckState.position.x, puckState.position.y);
-      puck.spawnX = puckState.spawn.x;
-      puck.spawnY = puckState.spawn.y;
-      samples.push({
-        id: puckState.id,
-        x: puckState.position.x,
-        y: puckState.position.y,
-        vx: puckState.velocity.x,
-        vy: puckState.velocity.y,
-      });
-    }
-
-    if (
-      state.phase === "PHYSICS_RESOLUTION" ||
-      state.phase === "GOAL_RESOLUTION"
-    ) {
-      this.fx.observeMotion(samples);
-    }
+    paintMatchState(this.scene, state, this.ball, this.pucks, this.fx);
   }
 
   private refreshUi(): void {
