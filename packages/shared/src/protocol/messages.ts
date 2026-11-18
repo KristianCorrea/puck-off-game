@@ -13,6 +13,9 @@ export const SOCKET_EVENTS = {
   JOIN_ROOM: "JOIN_ROOM",
   READY: "READY",
   LAUNCH_PUCK: "LAUNCH_PUCK",
+  /** Live aim preview (cosmetic); server relays to opponent. */
+  AIM_UPDATE: "AIM_UPDATE",
+  AIM_CLEAR: "AIM_CLEAR",
   REMATCH: "REMATCH",
   LEAVE_ROOM: "LEAVE_ROOM",
   RECONNECT_ROOM: "RECONNECT_ROOM",
@@ -52,6 +55,17 @@ export type LaunchPuckPayload = {
   /** 0..1 */
   power: number;
 };
+
+/** Cosmetic aim preview — origin is puck position on each client. */
+export type AimUpdatePayload = {
+  puckId: string;
+  /** Radians */
+  angle: number;
+  /** 0..1 */
+  power: number;
+};
+
+export type AimClearPayload = Record<string, never>;
 
 export type RematchPayload = Record<string, never>;
 

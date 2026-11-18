@@ -38,6 +38,8 @@ export {
   type JoinRoomPayload,
   type ReadyPayload,
   type LaunchPuckPayload,
+  type AimUpdatePayload,
+  type AimClearPayload,
   type RematchPayload,
   type ReconnectRoomPayload,
   type RoomCreatedPayload,
