@@ -23,13 +23,15 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
-**Phase 2:** hot-seat local match — 5 teal (P1) vs 5 coral (P2) pucks. Alternate turns, first to 3 or timer. Tune physics in `prototypeConfig.ts`, match rules in `gameConfig.ts`.
+**Phase 3:** engine-driven hot-seat match — 5 teal (P1) vs 5 coral (P2) pucks. Alternate turns, first to 3, ~20s turn timer. Shared rules/physics in `packages/shared` + `packages/game-engine`; client paints Match state.
 
 ## Workspace
 
 ```text
-apps/client   Vite + TypeScript + Phaser 3 (+ Matter physics)
-docs/         Plan + phase guides
+apps/client            Vite + TypeScript + Phaser 3 (view + input)
+packages/shared        GAME_CONFIG, types, protocol stubs
+packages/game-engine   Authoritative Match + Matter (local now; server later)
+docs/                  Plan + phase guides
 ```
 
 ## Docs
@@ -40,4 +42,4 @@ docs/         Plan + phase guides
 | [docs/PLAN.md](./docs/PLAN.md) | Rules, architecture, MVP scope |
 | [docs/phases/](./docs/phases/README.md) | Phase-by-phase guides |
 
-Currently at **Phase 2** — local match. Next: [Phase 3 game engine](./docs/phases/PHASE_03_GAME_ENGINE.md).
+Currently at **Phase 3 complete** — engine-driven local match. Next: [Phase 4 multiplayer server](./docs/phases/PHASE_04_MULTIPLAYER_SERVER.md).

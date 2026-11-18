@@ -24,8 +24,9 @@ Milestone:
 - Server runs `game-engine` (authoritative Matter, fixed timestep)
 - Client sends `LAUNCH_PUCK` intent only
 - Server broadcasts `TURN_RESOLVED`
-- Shooter: optimistic local anim + reconcile
+- Shooter: step a **local engine copy** (or replay) for immediate motion; reconcile to server result
 - Opponent: waits for `TURN_RESOLVED` (no `LAUNCH_CONFIRMED` in MVP)
+- **No second Matter world** — Phaser paints engine / resolved state only (same as Phase 3 local)
 
 ---
 
@@ -38,7 +39,7 @@ apps/
 │       ├── networking/
 │       │   ├── socket.ts
 │       │   └── handlers.ts      # apply TURN_RESOLVED, reconcile
-│       └── game/                # optimistic local Matter playback
+│       └── game/                # paint engine state (local copy and/or TURN_RESOLVED)
 └── server/
     ├── package.json
     └── src/
@@ -101,13 +102,15 @@ Do **not** stream per-frame physics over the wire.
 ## Client feel (locked)
 
 ```text
-Shooter:  release → local Matter anim + LAUNCH_PUCK
-Server:   validate → simulate → TURN_RESOLVED
-Opponent: idle until TURN_RESOLVED → apply result
-Shooter:  TURN_RESOLVED → reconcile to server finals
+Shooter:  release → applyAction on local Match copy + step/paint + LAUNCH_PUCK
+Server:   validate → simulate (same Match API) → TURN_RESOLVED
+Opponent: idle until TURN_RESOLVED → apply/paint result
+Shooter:  TURN_RESOLVED → snap/correct to server finals if needed
 ```
 
-If launch rejected: cancel local anim, restore pre-shot positions.
+If launch rejected: stop local playback, restore pre-shot engine/view state.
+
+“Optimistic” here means **immediate local engine steps**, not a separate Phaser Matter sim racing the server.
 
 ---
 
@@ -167,7 +170,7 @@ Minimal join UI is OK (hardcoded inputs / debug panel). Pretty menus are Phase 7
 - [ ] Server starts; client connects
 - [ ] Two clients play a short match in one room
 - [ ] Server is authority for score/turn/finals
-- [ ] Optimistic reconcile works for shooter
+- [ ] Shooter local engine playback + reconcile to `TURN_RESOLVED` works
 - [ ] No per-frame physics spam on the socket
 - [ ] Shared protocol types live in `packages/shared`
 

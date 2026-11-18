@@ -18,7 +18,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - **Thin first:** prove the flick (Phase 0–1) before full monorepo / server / engine.
 - **Do not** invent economy, accounts, matchmaking, cosmetics, or formation pickers for MVP.
 - If something is ambiguous, choose the simplest option that preserves core play and isolate it (config / small function).
-- Phase 3 underway: `@puck-off/shared` + `@puck-off/game-engine`; client is view/input over the engine.
+- Phase 3 complete: `@puck-off/shared` + `@puck-off/game-engine`; client is view/input over the engine. Next: Phase 4 server.
 
 ## Locked MVP decisions (quick)
 
@@ -39,7 +39,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 
 - Client: React + Vite + TypeScript + Phaser 3 + Matter.js
 - Server: Node + TypeScript + Socket.IO
-- Packages (later phases): `game-engine`, `shared`
+- Packages: `game-engine`, `shared` (server app in Phase 4)
 
 ## Ownership cheat sheet
 
@@ -65,4 +65,4 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 
 > Can I flick a puck at a ball and does the collision feel satisfying?
 
-**Phase 2 local match is in the client.** Run `npm run dev` for hot-seat play (5v5 pucks, turns, score, turn timer). Tune physics in `prototypeConfig.ts`, match rules in `gameConfig.ts`.
+**Phase 3 local match is engine-driven.** Run `npm run dev` for hot-seat play (5v5 pucks, turns, score, turn timer). Tune shared physics/rules in `packages/shared` (`GAME_CONFIG`); client paints `Match` state.

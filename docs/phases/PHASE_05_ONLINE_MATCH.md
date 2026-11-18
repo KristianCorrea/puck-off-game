@@ -24,7 +24,7 @@ Create room
   → Join room
   → Both ready
   → Countdown
-  → Turns with optimistic shooter / waiting opponent
+  → Turns with snappy shooter engine playback / waiting opponent
   → Goals (incl. own goals) + midfield ball + **pucks reset**
   → First to 3
   → Turn timer skip when a player idles out

@@ -46,5 +46,5 @@ Canonical game rules and architecture live in [`docs/PLAN.md`](../PLAN.md). Agen
 - Pucks ejected from goal pockets at end of turn
 - First to 3 wins (no match-duration clock)
 - ~20s turn timer; expiry skips the turn
-- Shooter: optimistic local anim; opponent: wait for `TURN_RESOLVED`
-- Server Matter.js = truth; client Matter.js = feel
+- Shooter: render local/server engine steps; opponent: wait for `TURN_RESOLVED`
+- `game-engine` Matter = truth; Phaser paints engine state (no second sim)

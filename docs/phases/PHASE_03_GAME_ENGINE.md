@@ -1,6 +1,6 @@
 # Phase 3 — Separate Game Engine
 
-**Status:** In progress — client renders engine sim (no dual Matter)  
+**Status:** Complete — client renders one engine sim (no dual Matter)
 
 **Depends on:** Phase 2 (local match works)  
 **Unblocks:** Phase 4  
@@ -31,15 +31,13 @@ The renderer must stop being the source of truth for score, turns, and winners.
 ```text
 puck-off/
 ├── apps/
-│   └── client/                    # Phaser/React consume engine
+│   └── client/                    # Phaser paints engine state + input
 ├── packages/
 │   ├── game-engine/
 │   │   ├── package.json
 │   │   └── src/
-│   │       ├── Match.ts           # public API
-│   │       ├── MatchState.ts
+│   │       ├── Match.ts           # public API (start / applyAction / step / …)
 │   │       ├── GameRules.ts
-│   │       ├── TurnManager.ts
 │   │       ├── handleGoal.ts      # ball midfield + pucks reset to start layout
 │   │       ├── physics/
 │   │       │   ├── MatterWorld.ts
@@ -54,15 +52,14 @@ puck-off/
 │           │   ├── LaunchAction.ts
 │           │   ├── MatchState.ts
 │           │   └── MatchPhase.ts
-│           └── protocol/          # message types (can be stubs until Phase 4)
+│           └── protocol/          # message types (stubs until Phase 4)
 └── ...
 ```
 
-### Public engine shape (target)
+### Public engine shape (shipped)
 
 ```ts
-const game = new Match(config);
-
+const game = new Match();
 game.start();
 
 game.applyAction({
@@ -72,6 +69,13 @@ game.applyAction({
   power: 0.75,
 });
 
+// Local / online shooter: step each frame and paint getState()
+game.step(deltaMs);
+
+// On goal: phase → GOAL_RESOLUTION (physics keeps playing through);
+// after celebration UI: game.completeGoalResolution();
+
+// Tests / headless batch: game.settle();
 const state = game.getState();
 ```
 
@@ -81,24 +85,26 @@ const state = game.getState();
 
 | Item | Detail |
 |------|--------|
-| Match API | start / applyAction / getState |
+| Match API | start / applyAction / step / completeGoalResolution / settle / getState |
 | Validation | turn, ownership, phase, power clamp |
-| Physics | Matter sim until settled + max timeout |
+| Physics | Matter fixed-dt until settled + max timeout |
 | Scoring | normal + own goal |
 | Goals | `handleGoal()` → ball midfield, clear velocities, **pucks reset** to start layout |
 | Win / turn timer | First to 3; ~20s turn clock skips turn (same as Phase 2) |
 | Layout | defense layout from config |
 | Tests | unit tests for rules (see checklist) |
 
-Client becomes a **view + input** over engine state (still local; no net).
-Local play: `applyAction` → `step(delta)` each frame → paint sprites from `getState()`.
+Client is a **view + input** over engine state (local hot-seat; no net yet).
+
+Local play: `applyAction` → `step(delta)` each frame → paint sprites from `getState()`.  
+Phaser Matter `autoUpdate` is off — display proxies only, not a second sim.
 
 ---
 
 ## What NOT to build
 
 - Socket.IO server (Phase 4)
-- Optimistic net reconcile
+- Net reconcile / rooms
 - Production deploy
 - New game modes / economy / formations
 - Rewriting Phase 1 feel “while we’re here” unless a bug is found
@@ -107,16 +113,16 @@ Local play: `applyAction` → `step(delta)` each frame → paint sprites from `g
 
 ## Test checklist (engine)
 
-- [ ] Turn switching
-- [ ] Cannot control opponent puck
-- [ ] Reusable pucks (no `used` flag required)
-- [ ] Scoring + own goals
-- [ ] After goal: ball midfield + pucks reset to start layout
-- [ ] End of turn: eject pucks from goal pockets
-- [ ] First to 3 ends immediately
-- [ ] Turn timer expiry skips turn (match continues)
-- [ ] Invalid action rejected (wrong turn, bad power, etc.)
-- [ ] Full short match sequence
+- [x] Turn switching
+- [x] Cannot control opponent puck
+- [x] Reusable pucks (no `used` flag required)
+- [x] Scoring + own goals (rules + `handleGoalReset`; live match scores via ball-center zones)
+- [x] After goal: ball midfield + pucks reset to start layout
+- [x] End of turn: eject pucks from goal pockets
+- [x] First to 3 ends immediately
+- [x] Turn timer expiry skips turn (match continues)
+- [x] Invalid action rejected (wrong turn, bad power, etc.)
+- [x] Full short match sequence (hot-seat playable end-to-end)
 
 ---
 
@@ -126,7 +132,7 @@ Local play: `applyAction` → `step(delta)` each frame → paint sprites from `g
 |------|--------|
 | Engine | Extract without changing rules |
 | Client | Wire scene to `Match` API; keep flick feel |
-| Reviewer | Diff should be mostly moves + tests; behavior parity with Phase 2 |
+| Reviewer | Behavior parity with Phase 2; **one** physics truth |
 
 **Parity rule:** a Phase 2 hot-seat match and a Phase 3 engine-driven match should feel the same.
 
@@ -134,12 +140,12 @@ Local play: `applyAction` → `step(delta)` each frame → paint sprites from `g
 
 ## Definition of Done
 
-- [ ] `game-engine` builds independently
-- [ ] Client match uses engine for rules/physics outcomes
-- [ ] No Phaser/React imports inside `game-engine`
-- [ ] Shared `GAME_CONFIG` used by engine (and client visuals)
-- [ ] Rule unit tests pass
-- [ ] Local match still playable end-to-end
+- [x] `game-engine` builds independently
+- [x] Client match uses engine for rules/physics outcomes
+- [x] No Phaser/React imports inside `game-engine`
+- [x] Shared `GAME_CONFIG` used by engine (and client visuals)
+- [x] Rule unit tests pass
+- [x] Local match still playable end-to-end
 
 ---
 
@@ -149,6 +155,6 @@ Phase 4 will run this engine on Node behind Socket.IO.
 
 Call out early:
 
-- Headless Matter / fixed timestep needs to work in Node
+- Headless Matter / fixed timestep needs to work in Node (`Match.step` / `settle`)
 - `TURN_RESOLVED` payload shape (final positions, score, turn, phase, winner)
-- Client should **render the engine** (local copy or server snapshots), not a second competing Matter sim
+- Client should **render the engine** (local copy for shooter snappiness, or apply/replay server result) — **not** a second competing Matter world

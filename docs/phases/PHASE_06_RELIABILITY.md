@@ -19,7 +19,7 @@ The server must reject garbage without crashing or desyncing the honest client.
 
 - Validate every action against phase / turn / ownership / bounds
 - Reject duplicates and out-of-turn launches
-- Cancel optimistic anim when rejected
+- Cancel local engine playback when rejected
 - Short reconnect window (don’t instantly destroy the match)
 - Explicit abandonment rule if reconnect fails
 - Documented test matrix green (or consciously deferred with tickets)
@@ -40,7 +40,7 @@ apps/server/src/
 apps/client/src/
 ├── networking/
 │   ├── reconcile.ts
-│   └── optimisticLaunch.ts        # cancel/restore on reject
+│   └── optimisticLaunch.ts        # cancel/restore local Match playback on reject
 └── ...
 packages/game-engine/
 └── tests/                         # expand edge-case coverage
@@ -87,7 +87,7 @@ Keep disconnect/abandon behavior **isolated** so policy can change later.
 |------|--------|
 | Action guards | Phase + turn + ownership + numeric clamps |
 | Idempotency | Duplicate launch doesn’t double-apply |
-| Reject message | Client gets a clear failure → cancel optimistic anim |
+| Reject message | Client gets a clear failure → cancel local playback |
 | Reconnect | Short pause/wait; resume with authoritative state snapshot |
 | Abandon | Isolated policy (e.g. opponent wins / draw / void — pick one, document it) |
 
@@ -109,7 +109,7 @@ Keep disconnect/abandon behavior **isolated** so policy can change later.
 |------|--------|
 | QA | Run the matrix; file repros |
 | Backend | Make invalid paths boring and safe |
-| Client | Reconcile / cancel optimistic paths |
+| Client | Reconcile / cancel local engine playback |
 | Reviewer | Require matrix notes in the PR or a checklist comment |
 
 ---

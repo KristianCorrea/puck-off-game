@@ -27,9 +27,9 @@ These decisions are locked for the MVP unless explicitly changed later:
 | Pucks in goal | At end of turn, any puck center still in a pocket is **ejected** onto the pitch |
 | Win condition | **First to 3** ends the match immediately (no match-duration clock in MVP) |
 | Turn timer | **~20s** per turn; expiry **skips** the turn (does not end the match) |
-| Physics feel (shooter) | **Optimistic local animation** on release — snappy, immediate |
+| Physics feel (shooter) | **Render engine steps immediately** on release (local Match copy online) |
 | Physics sync (opponent) | **Wait for `TURN_RESOLVED`** — no `LAUNCH_CONFIRMED` required for MVP |
-| Authority | Server Matter.js is truth; client Matter.js is visual playback only |
+| Authority | `game-engine` Matter is truth; Phaser paints engine / resolved state (no second sim) |
 | Build order | **Thin first** — prove the flick in one client app before full monorepo/server |
 
 ---
@@ -663,10 +663,10 @@ Because gameplay is turn-based, the network model can be much simpler.
 ## MVP message flow
 
 ```text
-Shooter:  release → local Matter animation + send LAUNCH_PUCK
-Server:   validate → simulate until settled → broadcast TURN_RESOLVED
-Opponent: waits for TURN_RESOLVED → apply/play result
-Shooter:  on TURN_RESOLVED → reconcile to server final state
+Shooter:  release → local Match applyAction + step/paint + send LAUNCH_PUCK
+Server:   validate → simulate (same Match) until settled → broadcast TURN_RESOLVED
+Opponent: waits for TURN_RESOLVED → apply/paint result
+Shooter:  on TURN_RESOLVED → reconcile to server final state if needed
 ```
 
 The client sends intent:
@@ -683,10 +683,10 @@ TURN_RESOLVED  { final positions, score, currentTurn, phase, winner/result if an
 
 ## Client feel (locked)
 
-- **Shooter:** optimistic local animation on release — snappiest possible feel. Do not wait for the server before starting motion.
+- **Shooter:** start local `Match` steps on release — snappiest possible feel. Do not wait for the server before starting motion.
 - **Opponent:** wait for `TURN_RESOLVED`. No early `LAUNCH_CONFIRMED` message is required for MVP.
-- **Authority:** client Matter.js is visual only. Server Matter.js decides score, goals, finals, and next turn.
-- **Reconciliation:** if local end state differs from server finals, snap/correct to server. If the shot is rejected, cancel local anim and restore pre-shot state.
+- **Authority:** server `game-engine` decides score, goals, finals, and next turn. Client Phaser is view/input only (no competing Matter world).
+- **Reconciliation:** if local end state differs from server finals, snap/correct to server. If the shot is rejected, stop local playback and restore pre-shot state.
 
 Optional later (not MVP): include keyframes in `TURN_RESOLVED` so the opponent sees a replay of the shot path instead of a snap/lerp. Still no need for `LAUNCH_CONFIRMED` unless playtesting shows the opponent wait feels dead.
 
@@ -775,8 +775,8 @@ Use:
 |--------|--------|
 | Menus, lobby, room code, result screen, connection status | React |
 | Arena drawing, aim UI, particles, local flick feel | Phaser |
-| Official physics, score, turns, win conditions | `game-engine` on the **server** |
-| Instant flick animation | Local Matter.js in Phaser (**visual only**) |
+| Official physics, score, turns, win conditions | `game-engine` (server online; local Match for hot-seat) |
+| Instant flick animation | Render engine steps immediately after launch |
 
 React should handle:
 
@@ -1211,7 +1211,7 @@ Implement:
 - authoritative physics (fixed timestep on Node)
 - `TURN_RESOLVED` broadcasting
 
-Shooter client: optimistic local Matter animation + reconcile on `TURN_RESOLVED`.
+Shooter client: local Match steps for immediate motion + reconcile on `TURN_RESOLVED`.
 
 Opponent client: wait for `TURN_RESOLVED` (no `LAUNCH_CONFIRMED` in MVP).
 
@@ -1273,7 +1273,7 @@ Test:
 - invalid puck ID
 - invalid power
 - invalid angle
-- rejected shot cancels optimistic local anim
+- rejected shot cancels local engine playback
 - full room
 - leaving before match
 - disconnecting during match
@@ -1398,7 +1398,7 @@ Multiplayer tests should cover:
 - player assignment
 - messages
 - invalid actions
-- rejected optimistic launch reconciliation
+- rejected local launch reconciliation
 - disconnect
 - reconnect
 - match completion
@@ -1517,9 +1517,9 @@ Always follow these rules:
 22. After a goal: ball → midfield and **pucks reset** to the defense start layout.
 23. Goal when ball **center** enters the pocket (immediate); eject resting pucks from pockets at end of turn.
 24. First to 3 wins; per-turn clock skips the turn (no match-duration clock in MVP).
-25. Shooter uses optimistic local animation; opponent waits for `TURN_RESOLVED` in MVP.
+25. Shooter renders local/server engine steps immediately; opponent waits for `TURN_RESOLVED` in MVP.
 26. Build thin first — do not over-scaffold monorepo/server/engine before the flick feels good.
-27. Client Matter.js is visual only; server Matter.js is truth.
+27. `game-engine` Matter is truth; Phaser paints engine state (no second competing sim).
 
 ---
 
@@ -1531,7 +1531,7 @@ Always follow these rules:
                          │                     │
                          │ React (UI chrome)   │
                          │ Phaser (render)     │
-                         │ Local Matter (feel) │
+                         │ Paint Match state   │
                          │ Input               │
                          └──────────┬──────────┘
                                     │
