@@ -12,6 +12,7 @@ const CRITICAL_MS = 5_000;
 
 /**
  * Combined nameplate + turn clock: identity, seconds, drain bar, urgency shake.
+ * P2 mirrors P1 (time on the inner edge, identity toward the outer edge).
  */
 export class TurnPlate {
   readonly container: Phaser.GameObjects.Container;
@@ -20,6 +21,7 @@ export class TurnPlate {
   private readonly scene: Phaser.Scene;
   private readonly baseX: number;
   private readonly color: number;
+  private readonly mirrored: boolean;
   private readonly bg: Phaser.GameObjects.Rectangle;
   private readonly barTrack: Phaser.GameObjects.Rectangle;
   private readonly barFill: Phaser.GameObjects.Rectangle;
@@ -37,52 +39,75 @@ export class TurnPlate {
     this.playerId = playerId;
     this.baseX = x;
     this.color = MATCH_CONFIG.players[playerId].color;
+    this.mirrored = playerId === "player2";
 
     const w = PLATE_W();
     const h = PLATE_H();
     const barH = BAR_H();
     const pad = u(6);
     this.barMaxW = w - pad * 2;
+    const barY = h / 2 - pad - barH / 2;
+    const rowY = -u(4);
 
     this.bg = scene.add
       .rectangle(0, 0, w, h, 0x122033, 0.95)
       .setStrokeStyle(u(2), this.color, 0.85);
 
     this.barTrack = scene.add
-      .rectangle(0, h / 2 - pad - barH / 2, this.barMaxW, barH, 0x0f172a, 0.95)
+      .rectangle(0, barY, this.barMaxW, barH, 0x0f172a, 0.95)
       .setOrigin(0.5);
 
+    // P1 drains L→R from left; P2 drains R→L from right (visual mirror).
     this.barFill = scene.add
       .rectangle(
-        -this.barMaxW / 2,
-        h / 2 - pad - barH / 2,
+        this.mirrored ? this.barMaxW / 2 : -this.barMaxW / 2,
+        barY,
         this.barMaxW,
         barH,
         this.color,
         1,
       )
-      .setOrigin(0, 0.5);
+      .setOrigin(this.mirrored ? 1 : 0, 0.5);
 
-    this.dot = scene.add.circle(-w / 2 + u(16), -u(4), u(7), this.color);
-
-    this.nameLabel = scene.add
-      .text(-w / 2 + u(28), -u(4), MATCH_CONFIG.players[playerId].short, {
-        fontFamily: FONT,
-        fontSize: `${u(15)}px`,
-        color: "#f8fafc",
-        fontStyle: "800",
-      })
-      .setOrigin(0, 0.5);
-
-    this.timeLabel = scene.add
-      .text(w / 2 - u(10), -u(4), "", {
-        fontFamily: FONT,
-        fontSize: `${u(14)}px`,
-        color: "#e2e8f0",
-        fontStyle: "800",
-      })
-      .setOrigin(1, 0.5)
-      .setVisible(false);
+    if (this.mirrored) {
+      this.dot = scene.add.circle(w / 2 - u(16), rowY, u(7), this.color);
+      this.nameLabel = scene.add
+        .text(w / 2 - u(28), rowY, MATCH_CONFIG.players[playerId].short, {
+          fontFamily: FONT,
+          fontSize: `${u(15)}px`,
+          color: "#f8fafc",
+          fontStyle: "800",
+        })
+        .setOrigin(1, 0.5);
+      this.timeLabel = scene.add
+        .text(-w / 2 + u(10), rowY, "", {
+          fontFamily: FONT,
+          fontSize: `${u(14)}px`,
+          color: "#e2e8f0",
+          fontStyle: "800",
+        })
+        .setOrigin(0, 0.5)
+        .setVisible(false);
+    } else {
+      this.dot = scene.add.circle(-w / 2 + u(16), rowY, u(7), this.color);
+      this.nameLabel = scene.add
+        .text(-w / 2 + u(28), rowY, MATCH_CONFIG.players[playerId].short, {
+          fontFamily: FONT,
+          fontSize: `${u(15)}px`,
+          color: "#f8fafc",
+          fontStyle: "800",
+        })
+        .setOrigin(0, 0.5);
+      this.timeLabel = scene.add
+        .text(w / 2 - u(10), rowY, "", {
+          fontFamily: FONT,
+          fontSize: `${u(14)}px`,
+          color: "#e2e8f0",
+          fontStyle: "800",
+        })
+        .setOrigin(1, 0.5)
+        .setVisible(false);
+    }
 
     this.container = scene.add
       .container(x, y, [
@@ -179,12 +204,14 @@ export class TurnPlate {
     const amp =
       secondsLeft <= 3 ? u(4) : secondsLeft <= 5 ? u(3) : u(2);
     const scalePop = secondsLeft <= 3 ? 1.12 : secondsLeft <= 5 ? 1.09 : 1.06;
+    // Shake toward center of the scoreboard so both sides feel mirrored.
+    const shakeDir = this.mirrored ? -1 : 1;
 
     this.stopShake();
     this.container.x = this.baseX;
     this.shakeTween = this.scene.tweens.add({
       targets: this.container,
-      x: this.baseX + amp,
+      x: this.baseX + amp * shakeDir,
       duration: 40,
       yoyo: true,
       repeat: secondsLeft <= 3 ? 3 : secondsLeft <= 5 ? 2 : 1,
