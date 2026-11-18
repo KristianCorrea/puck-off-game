@@ -80,10 +80,11 @@ export const MATCH_CONFIG = {
    */
   keyframeEverySteps: 2,
   /**
-   * After a scored shot, clients hold a short celebration before the next turn.
-   * Server pauses the turn clock for this long as well (on top of keyframe duration).
+   * After a scored shot online, hold ball-in-net + celebration before reset.
+   * Server pauses the turn clock for this long (on top of keyframe duration).
+   * Keep in sync with client GoalCelebration length.
    */
-  onlineGoalHoldMs: 1_200,
+  onlineGoalHoldMs: 5_000,
   players: {
     player1: {
       id: "player1" as const,

@@ -52,6 +52,8 @@ export class OnlineMatchController {
   /** Waiting for TURN_RESOLVED after we launched. */
   private awaitingResolve = false;
   private replay: KeyframeReplay | null = null;
+  /** Final post-goal reset — applied only after celebration holds ball-in-net. */
+  private pendingAuthority: MatchState | null = null;
   private preShotState: MatchState | null = null;
   private destroyed = false;
 
@@ -154,6 +156,7 @@ export class OnlineMatchController {
     this.goalPauseMs = 0;
     this.awaitingResolve = false;
     this.replay = null;
+    this.pendingAuthority = null;
     this.preShotState = null;
     this.socket.emit(SOCKET_EVENTS.REMATCH);
   }
@@ -205,6 +208,7 @@ export class OnlineMatchController {
 
     this.awaitingResolve = false;
     this.preShotState = null;
+    this.pendingAuthority = null;
 
     const frames = payload.keyframes ?? [];
     if (payload.reason === "launch" && frames.length > 0) {
@@ -223,7 +227,6 @@ export class OnlineMatchController {
       scored:
         payload.state.score.player1 !== this.score.player1 ||
         payload.state.score.player2 !== this.score.player2,
-      briefGoalFx: true,
     });
   };
 
@@ -231,6 +234,7 @@ export class OnlineMatchController {
     if (this.destroyed) return;
     this.awaitingResolve = false;
     this.replay = null;
+    this.pendingAuthority = null;
     const restore = this.preShotState ?? this.engine.getState();
     this.preShotState = null;
     this.hud.stopGoalCelebration();
@@ -243,6 +247,7 @@ export class OnlineMatchController {
     if (this.destroyed) return;
     this.awaitingResolve = false;
     this.replay = null;
+    this.pendingAuthority = null;
     this.preShotState = null;
     this.goalPauseMs = 0;
     this.turnAnnounce = false;
@@ -268,8 +273,25 @@ export class OnlineMatchController {
     // Replay finished.
     const scored = this.replay.scoredDuringReplay;
     const state = this.replay.authority;
+    const freeze = this.replay.getFreezePose();
     this.replay = null;
-    this.finishWithAuthority(state, { scored, briefGoalFx: scored });
+
+    if (scored) {
+      // Keep ball-in-net on screen for the full celebration; reset after.
+      this.paintReplayPose(freeze);
+      this.pendingAuthority = state;
+      this.score.player1 = state.score.player1;
+      this.score.player2 = state.score.player2;
+      this.result = state.result;
+      this.audio.playGoal();
+      this.hud.playGoalCelebration();
+      this.goalPauseMs = MATCH_CONFIG.goalCelebrationMs;
+      this.phase = "GOAL_RESOLUTION";
+      this.flick.setEnabled(false);
+      return;
+    }
+
+    this.finishWithAuthority(state, { scored: false });
   }
 
   private paintReplayPose(pose: {
@@ -308,21 +330,9 @@ export class OnlineMatchController {
 
   private finishWithAuthority(
     state: MatchState,
-    opts: { scored: boolean; briefGoalFx: boolean },
+    opts: { scored: boolean },
   ): void {
     this.applyAuthority(state);
-
-    if (opts.scored && opts.briefGoalFx && state.phase !== "MATCH_END") {
-      this.audio.playGoal();
-      this.hud.playGoalCelebration();
-      this.goalPauseMs = Math.min(
-        MATCH_CONFIG.onlineGoalHoldMs,
-        MATCH_CONFIG.goalCelebrationMs,
-      );
-      this.phase = "GOAL_RESOLUTION";
-      this.flick.setEnabled(false);
-      return;
-    }
 
     if (state.phase === "MATCH_END") {
       if (opts.scored) this.audio.playGoal();
@@ -339,6 +349,21 @@ export class OnlineMatchController {
     if (this.goalPauseMs > 0) return;
 
     this.hud.stopGoalCelebration();
+
+    const pending = this.pendingAuthority;
+    this.pendingAuthority = null;
+    if (pending) {
+      // Now reset to midfield / next turn (or match end).
+      this.applyAuthority(pending);
+      if (pending.phase === "MATCH_END") {
+        this.audio.playWin();
+        this.flick.setEnabled(false);
+        return;
+      }
+      this.enterPlayerTurnFromState(pending);
+      return;
+    }
+
     const state = this.engine.getState();
     if (state.phase === "MATCH_END") {
       this.audio.playWin();
