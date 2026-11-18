@@ -18,7 +18,7 @@ If a phase guide disagrees with `docs/PLAN.md`, **follow the plan** and update t
 - **Thin first:** prove the flick (Phase 0–1) before full monorepo / server / engine.
 - **Do not** invent economy, accounts, matchmaking, cosmetics, or formation pickers for MVP.
 - If something is ambiguous, choose the simplest option that preserves core play and isolate it (config / small function).
-- Phase 6 done: online validation, 30s reconnect window, abandon = opponent wins. Next: Phase 10 deploy (or Phase 7 UI). Local hot-seat via **LOCAL** still default.
+- Phase 10 thin ready: `docs/DEPLOYMENT.md`, Dockerfile, `fly.toml`. Set `VITE_SERVER_URL` + `CLIENT_ORIGIN`, then deploy. Local hot-seat via **LOCAL** still default.
 
 ## Locked MVP decisions (quick)
 
