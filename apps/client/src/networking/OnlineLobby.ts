@@ -6,6 +6,7 @@ import {
   type MatchStartPayload,
   type PlayerId,
   type RoomCreatedPayload,
+  type RoomPlayerInfo,
   type RoomStatePayload,
 } from "@puck-off/shared";
 import {
@@ -13,7 +14,7 @@ import {
   loadResumeSession,
   saveResumeSession,
 } from "./resumeSession";
-import { connectSocket, getServerUrl } from "./socket";
+import { connectSocket } from "./socket";
 
 export type OnlineLobbyResult = {
   socket: Socket;
@@ -22,8 +23,10 @@ export type OnlineLobbyResult = {
   matchStart: MatchStartPayload;
 };
 
+type LobbyStage = "gate" | "room" | "countdown";
+
 /**
- * Minimal DOM lobby: create / join / ready / countdown / reconnect.
+ * DOM lobby: create / join / seat cards / ready toggle / countdown / reconnect.
  * Resolves on MATCH_START or MATCH_RESUME.
  */
 export function runOnlineLobby(): Promise<OnlineLobbyResult> {
@@ -32,6 +35,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     const statusEl = document.getElementById("lobby-status");
     const codeEl = document.getElementById("lobby-code");
     const countdownEl = document.getElementById("lobby-countdown");
+    const hintEl = document.getElementById("lobby-hint");
     const joinInput = document.getElementById(
       "lobby-join-input",
     ) as HTMLInputElement | null;
@@ -39,15 +43,30 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     const joinBtn = document.getElementById("lobby-join-btn");
     const readyBtn = document.getElementById("lobby-ready-btn");
     const leaveBtn = document.getElementById("lobby-leave-btn");
-    const serverEl = document.getElementById("lobby-server");
+    const copyBtn = document.getElementById("lobby-copy-btn");
+    const seatP1 = document.getElementById("lobby-seat-p1");
+    const seatP2 = document.getElementById("lobby-seat-p2");
 
     if (!root) {
       reject(new Error("Missing #online-lobby"));
       return;
     }
 
+    let stage: LobbyStage = "gate";
+    let myReady = false;
+
     const setStatus = (msg: string): void => {
       if (statusEl) statusEl.textContent = msg;
+    };
+
+    const setHint = (msg: string): void => {
+      if (hintEl) hintEl.textContent = msg;
+    };
+
+    const setStage = (next: LobbyStage): void => {
+      stage = next;
+      root.classList.remove("is-gate", "is-room", "is-countdown");
+      root.classList.add(`is-${next}`);
     };
 
     const setCountdown = (seconds: number | null): void => {
@@ -61,7 +80,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       countdownEl.classList.add("is-visible");
     };
 
-    const setLobbyControlsEnabled = (enabled: boolean): void => {
+    const setGateEnabled = (enabled: boolean): void => {
       if (enabled) {
         createBtn?.removeAttribute("disabled");
         joinBtn?.removeAttribute("disabled");
@@ -73,11 +92,80 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       }
     };
 
+    const syncReadyButton = (ready: boolean, enabled: boolean): void => {
+      myReady = ready;
+      if (!readyBtn) return;
+      readyBtn.textContent = ready ? "UNREADY" : "READY";
+      readyBtn.classList.toggle("is-ready-on", ready);
+      if (enabled) readyBtn.removeAttribute("disabled");
+      else readyBtn.setAttribute("disabled", "true");
+    };
+
+    const paintSeat = (
+      el: HTMLElement | null,
+      info: RoomPlayerInfo | undefined,
+      you: boolean,
+    ): void => {
+      if (!el) return;
+      const statusEl = el.querySelector(".lobby-seat-status");
+      const youEl = el.querySelector(".lobby-seat-you") as HTMLElement | null;
+
+      el.classList.toggle("is-you", you);
+      el.classList.toggle("is-empty", !info?.connected);
+      el.classList.toggle("is-ready", Boolean(info?.connected && info.ready));
+
+      if (youEl) youEl.hidden = !you;
+
+      if (!statusEl) return;
+      if (!info?.connected) {
+        statusEl.textContent = "Waiting…";
+      } else if (info.ready) {
+        statusEl.textContent = "Ready ✓";
+      } else {
+        statusEl.textContent = you ? "Not ready" : "Joined";
+      }
+    };
+
+    const paintSeats = (
+      players: RoomPlayerInfo[],
+      yourId: PlayerId | null,
+    ): void => {
+      const p1 = players.find((p) => p.playerId === "player1");
+      const p2 = players.find((p) => p.playerId === "player2");
+      paintSeat(seatP1, p1, yourId === "player1");
+      paintSeat(seatP2, p2, yourId === "player2");
+
+      const bothIn = Boolean(p1?.connected && p2?.connected);
+      const bothReady = Boolean(p1?.ready && p2?.ready);
+      if (!bothIn) {
+        setHint(
+          yourId === "player1"
+            ? "Share the code — waiting for opponent."
+            : "Waiting for host…",
+        );
+      } else if (!bothReady) {
+        setHint("Both players must Ready to start.");
+      } else {
+        setHint("Both ready — starting…");
+      }
+    };
+
+    const enterRoomUi = (code: string): void => {
+      if (codeEl) codeEl.textContent = code;
+      setStage("room");
+      setCountdown(null);
+      setGateEnabled(false);
+      leaveBtn?.removeAttribute("disabled");
+      syncReadyButton(false, true);
+    };
+
     root.classList.add("is-visible");
     root.setAttribute("aria-hidden", "false");
-    if (serverEl) serverEl.textContent = getServerUrl();
+    setStage("gate");
     setStatus("Connecting…");
+    setHint("Share the code, then both Ready.");
     setCountdown(null);
+    paintSeats([], null);
 
     const socket = connectSocket();
     let myPlayerId: PlayerId | null = null;
@@ -97,6 +185,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       root.classList.remove("is-visible");
       root.setAttribute("aria-hidden", "true");
       setCountdown(null);
+      setStage("gate");
     };
 
     const finish = (payload: MatchStartPayload): void => {
@@ -120,30 +209,34 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       const resume = loadResumeSession();
       if (resume) {
         setStatus(`Reconnecting to ${resume.code}…`);
-        setLobbyControlsEnabled(false);
+        setGateEnabled(false);
         socket.emit(SOCKET_EVENTS.RECONNECT_ROOM, {
           code: resume.code,
           resumeToken: resume.resumeToken,
         });
         return;
       }
-      setStatus("Connected. Create or join a room.");
+      setStatus("");
+      setStage("gate");
+      setGateEnabled(true);
     });
 
     socket.on("connect_error", () => {
-      setStatus(`Cannot reach ${getServerUrl()} — is the server running?`);
+      setStatus("Cannot reach the server — try again in a moment.");
     });
 
     socket.on(SOCKET_EVENTS.ERROR, (payload: { message?: string }) => {
       const msg = payload?.message ?? "Server error";
-      // Stale resume token — clear and let them create/join.
       if (
         msg.toLowerCase().includes("resume") ||
         msg.toLowerCase().includes("not found") ||
         msg.toLowerCase().includes("reconnect")
       ) {
         clearResumeSession();
-        setLobbyControlsEnabled(true);
+        setStage("gate");
+        setGateEnabled(true);
+        syncReadyButton(false, false);
+        leaveBtn?.setAttribute("disabled", "true");
       }
       fail(msg);
     });
@@ -151,11 +244,24 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     socket.on(SOCKET_EVENTS.ROOM_CREATED, (payload: RoomCreatedPayload) => {
       myPlayerId = payload.playerId;
       roomCode = payload.code;
-      if (codeEl) codeEl.textContent = payload.code;
       persistResume(payload.resumeToken);
-      setStatus(`Room ${payload.code} — waiting for opponent, then Ready.`);
-      readyBtn?.removeAttribute("disabled");
-      leaveBtn?.removeAttribute("disabled");
+      enterRoomUi(payload.code);
+      setStatus("Room created");
+      paintSeats(
+        [
+          {
+            playerId: "player1",
+            ready: false,
+            connected: payload.playerId === "player1",
+          },
+          {
+            playerId: "player2",
+            ready: false,
+            connected: payload.playerId === "player2",
+          },
+        ],
+        myPlayerId,
+      );
     });
 
     socket.on(SOCKET_EVENTS.ROOM_STATE, (payload: RoomStatePayload) => {
@@ -164,33 +270,44 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       if (codeEl) codeEl.textContent = payload.code;
       persistResume(payload.resumeToken);
 
-      const p1 = payload.players.find((p) => p.playerId === "player1");
-      const p2 = payload.players.find((p) => p.playerId === "player2");
-      const seatLine = `P1 ${p1?.connected ? (p1.ready ? "ready" : "in") : "—"} · P2 ${p2?.connected ? (p2.ready ? "ready" : "in") : "—"}`;
+      const me = payload.players.find((p) => p.playerId === myPlayerId);
+      paintSeats(payload.players, myPlayerId);
 
       if (payload.phase === "countdown") {
-        setLobbyControlsEnabled(false);
-        readyBtn?.setAttribute("disabled", "true");
-        setStatus(`${payload.code} · starting…`);
+        setStage("countdown");
+        setGateEnabled(false);
+        syncReadyButton(true, false);
+        leaveBtn?.removeAttribute("disabled");
+        setStatus("Match starting…");
         return;
       }
 
       if (payload.phase === "lobby") {
+        setStage("room");
         setCountdown(null);
-        setLobbyControlsEnabled(true);
-        readyBtn?.removeAttribute("disabled");
+        setGateEnabled(false);
         leaveBtn?.removeAttribute("disabled");
-        setStatus(`${payload.code} · ${seatLine}`);
+        syncReadyButton(Boolean(me?.ready), true);
+        setStatus(payload.code);
         return;
       }
 
-      setStatus(`${payload.code} · ${seatLine}`);
+      // playing / ended — keep room chrome until MATCH_START/RESUME finishes.
+      setStage("room");
+      syncReadyButton(Boolean(me?.ready), false);
+      setStatus(payload.code);
     });
 
     socket.on(SOCKET_EVENTS.COUNTDOWN, (payload: CountdownPayload) => {
-      setLobbyControlsEnabled(false);
-      readyBtn?.setAttribute("disabled", "true");
+      setStage("countdown");
+      setGateEnabled(false);
+      syncReadyButton(true, false);
       setCountdown(payload.seconds);
+      setHint(
+        payload.seconds > 0
+          ? `Match starts in ${payload.seconds}…`
+          : "Match starting!",
+      );
       setStatus(
         payload.seconds > 0
           ? `Match starts in ${payload.seconds}…`
@@ -227,15 +344,30 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       clearResumeSession();
       socket.emit(SOCKET_EVENTS.JOIN_ROOM, { code });
       setStatus(`Joining ${code.toUpperCase()}…`);
-      readyBtn?.removeAttribute("disabled");
-      leaveBtn?.removeAttribute("disabled");
     });
 
     readyBtn?.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (stage !== "room") return;
       socket.emit(SOCKET_EVENTS.READY);
-      setStatus("Ready — waiting for both players…");
+      // Optimistic label; ROOM_STATE corrects if needed.
+      syncReadyButton(!myReady, true);
+      setStatus(myReady ? "Ready" : "Not ready");
+    });
+
+    copyBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const code = roomCode ?? codeEl?.textContent ?? "";
+      if (!code || code.includes("—")) {
+        setStatus("No room code yet");
+        return;
+      }
+      void navigator.clipboard?.writeText(code).then(
+        () => setStatus(`Copied ${code}`),
+        () => setStatus(`Code: ${code}`),
+      );
     });
 
     leaveBtn?.addEventListener("click", (e) => {
@@ -249,7 +381,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       window.location.assign(window.location.pathname);
     });
 
-    readyBtn?.setAttribute("disabled", "true");
+    syncReadyButton(false, false);
     leaveBtn?.setAttribute("disabled", "true");
   });
 }

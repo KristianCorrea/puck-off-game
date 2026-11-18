@@ -243,6 +243,7 @@ export class RoomManager {
     this.emitRoomState(room);
   }
 
+  /** Toggle ready in lobby. Both connected + ready starts countdown. */
   ready(socket: Socket): void {
     const room = this.roomForSocket(socket.id);
     if (!room) {
@@ -254,7 +255,7 @@ export class RoomManager {
 
     const seat = this.seatForSocket(room, socket.id);
     if (!seat) return;
-    seat.ready = true;
+    seat.ready = !seat.ready;
     this.emitRoomState(room);
 
     const bothReady =
