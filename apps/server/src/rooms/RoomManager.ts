@@ -1,11 +1,13 @@
 import type { Server, Socket } from "socket.io";
 import {
+  MATCH_CONFIG,
   SOCKET_EVENTS,
   type JoinRoomPayload,
   type LaunchPuckPayload,
   type PlayerId,
   type RoomPlayerInfo,
   type RoomStatePayload,
+  type TurnResolvedPayload,
 } from "@puck-off/shared";
 import { MatchManager, toTurnResolved } from "../matches/MatchManager";
 import { generateRoomCode, normalizeRoomCode } from "./roomCode";
@@ -21,6 +23,11 @@ type Room = {
   seats: { player1: Seat; player2: Seat };
   phase: "lobby" | "playing" | "ended";
   match: MatchManager;
+  /**
+   * Don't tick the turn clock / accept launches until clients finish keyframe replay.
+   * 0 = unlocked.
+   */
+  replayUnlockAtMs: number;
 };
 
 const TICK_MS = 250;
@@ -61,6 +68,7 @@ export class RoomManager {
       },
       phase: "lobby",
       match: new MatchManager(),
+      replayUnlockAtMs: 0,
     };
     this.rooms.set(code, room);
     this.socketRoom.set(socket.id, code);
@@ -138,6 +146,7 @@ export class RoomManager {
     if (!bothReady) return;
 
     room.phase = "playing";
+    room.replayUnlockAtMs = 0;
     const state = room.match.start();
     this.io.to(room.code).emit(SOCKET_EVENTS.MATCH_START, {
       code: room.code,
@@ -154,6 +163,10 @@ export class RoomManager {
     }
     if (room.phase !== "playing") {
       socket.emit(SOCKET_EVENTS.REJECT_LAUNCH, { reason: "WRONG_PHASE" });
+      return;
+    }
+    if (Date.now() < room.replayUnlockAtMs) {
+      socket.emit(SOCKET_EVENTS.REJECT_LAUNCH, { reason: "REPLAY_IN_PROGRESS" });
       return;
     }
 
@@ -185,10 +198,12 @@ export class RoomManager {
       return;
     }
 
+    this.lockReplayWindow(room, result.payload);
     this.io.to(room.code).emit(SOCKET_EVENTS.TURN_RESOLVED, result.payload);
 
     if (result.payload.phase === "MATCH_END") {
       room.phase = "ended";
+      room.replayUnlockAtMs = 0;
       this.emitRoomState(room);
     }
   }
@@ -212,6 +227,7 @@ export class RoomManager {
       room.seats.player1.ready = true;
       room.seats.player2.ready = true;
       room.phase = "playing";
+      room.replayUnlockAtMs = 0;
       const state = room.match.rematch();
       this.io.to(room.code).emit(SOCKET_EVENTS.MATCH_START, {
         code: room.code,
@@ -230,15 +246,32 @@ export class RoomManager {
   }
 
   private tickAll(): void {
+    const now = Date.now();
     for (const room of this.rooms.values()) {
       if (room.phase !== "playing") continue;
+      // Turn clock waits until clients finish keyframe replay (+ goal hold).
+      if (now < room.replayUnlockAtMs) continue;
+
       const ticked = room.match.tick(TICK_MS);
       if (!ticked?.skipped) continue;
+      room.replayUnlockAtMs = 0;
       this.io.to(room.code).emit(
         SOCKET_EVENTS.TURN_RESOLVED,
         toTurnResolved(ticked.state, "timeout"),
       );
     }
+  }
+
+  /**
+   * Pause turn timer / next launch until the longest client replay finishes.
+   */
+  private lockReplayWindow(room: Room, payload: TurnResolvedPayload): void {
+    const frames = payload.keyframes ?? [];
+    const replayMs =
+      frames.length > 0 ? frames[frames.length - 1]!.atMs : 0;
+    const scored = frames.some((f) => f.goal);
+    const holdMs = scored ? MATCH_CONFIG.onlineGoalHoldMs : 0;
+    room.replayUnlockAtMs = Date.now() + replayMs + holdMs;
   }
 
   private leaveCurrent(socket: Socket): void {
