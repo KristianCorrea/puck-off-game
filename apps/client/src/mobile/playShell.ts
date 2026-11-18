@@ -4,6 +4,10 @@
  */
 
 import { setPlayMode, type PlayMode } from "../networking/playMode";
+import {
+  startServerHealthPolling,
+  type ServerHealthStatus,
+} from "../networking/serverHealth";
 
 type OrientationLockType = "landscape" | "landscape-primary" | "landscape-secondary";
 
@@ -66,15 +70,38 @@ function setVisible(el: HTMLElement | null, visible: boolean): void {
   el.setAttribute("aria-hidden", visible ? "false" : "true");
 }
 
+function applyOnlineButtonStatus(
+  btn: HTMLButtonElement,
+  status: ServerHealthStatus,
+): void {
+  if (status === "online") {
+    btn.disabled = false;
+    btn.textContent = "ONLINE";
+    btn.title = "Multiplayer server is up";
+    return;
+  }
+  btn.disabled = true;
+  if (status === "checking") {
+    btn.textContent = "ONLINE · CHECKING…";
+    btn.title = "Checking multiplayer server…";
+  } else {
+    btn.textContent = "ONLINE · OFFLINE";
+    btn.title = "Multiplayer server unreachable — retrying every 10s";
+  }
+}
+
 /**
  * Wire DOM overlays. Call once from main before/after creating the Phaser game.
  * Mode buttons set local/online then dismiss the gate (and request fullscreen on touch).
+ * ONLINE stays disabled until GET /health succeeds (polled every 10s).
  */
 export function installPlayShell(): void {
   const tap = document.getElementById("tap-to-play");
   const rotate = document.getElementById("rotate-overlay");
   const localBtn = document.getElementById("play-local-btn");
-  const onlineBtn = document.getElementById("play-online-btn");
+  const onlineBtn = document.getElementById(
+    "play-online-btn",
+  ) as HTMLButtonElement | null;
 
   // Desktop with ?mode=… can skip the chooser; touch still needs a gesture.
   const params = new URLSearchParams(window.location.search);
@@ -89,18 +116,21 @@ export function installPlayShell(): void {
     setVisible(tap, !needRotate && !playStarted);
   };
 
+  let stopHealthPoll: (() => void) | null = null;
+
   let entering = false;
   const dismissTapGate = async (mode: PlayMode): Promise<void> => {
     if (playStarted || entering) return;
+    if (mode === "online" && onlineBtn?.disabled) return;
     entering = true;
+    stopHealthPoll?.();
+    stopHealthPoll = null;
     setPlayMode(mode);
     playStarted = true;
     setVisible(tap, false);
     await enterPlayMode();
     entering = false;
     syncOverlays();
-    // Arena may already be creating — reload so create() sees the mode.
-    // Only reload if Phaser already booted past create with wrong mode.
     window.dispatchEvent(
       new CustomEvent("puckoff-mode-chosen", { detail: { mode } }),
     );
@@ -122,6 +152,18 @@ export function installPlayShell(): void {
     (e) => onModeClick(e, "online"),
     { passive: false },
   );
+
+  // Gate ONLINE on server health while the mode chooser is visible.
+  if (onlineBtn && !playStarted) {
+    applyOnlineButtonStatus(onlineBtn, "checking");
+    stopHealthPoll = startServerHealthPolling({
+      intervalMs: 10_000,
+      shouldContinue: () => !playStarted,
+      onStatus: (status) => {
+        if (!playStarted) applyOnlineButtonStatus(onlineBtn, status);
+      },
+    });
+  }
 
   syncOverlays();
   window.addEventListener("resize", syncOverlays);

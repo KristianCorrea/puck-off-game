@@ -3,6 +3,7 @@ import { ArenaScene } from "./game/ArenaScene";
 import { PROTOTYPE_CONFIG } from "./game/config/prototypeConfig";
 import { installPlayShell } from "./mobile/playShell";
 import { getPlayMode, setPlayMode, type PlayMode } from "./networking/playMode";
+import { waitUntilServerOnline } from "./networking/serverHealth";
 
 const parent = document.getElementById("game");
 
@@ -66,7 +67,12 @@ if (queryMode) {
   // Still show tap gate on coarse pointers for fullscreen; desktop starts now.
   const coarse = window.matchMedia("(pointer: coarse)").matches;
   if (!coarse) {
-    startGame();
+    if (queryMode === "online") {
+      // Wait for /health so deep-link online doesn't enter a dead lobby.
+      void waitUntilServerOnline().then(() => startGame());
+    } else {
+      startGame();
+    }
   } else {
     window.addEventListener(
       "puckoff-mode-chosen",
