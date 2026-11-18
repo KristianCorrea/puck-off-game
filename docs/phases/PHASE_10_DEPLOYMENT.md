@@ -1,7 +1,7 @@
 # Phase 10 — Deployment
 
-**Status:** Ship  
-**Depends on:** Phase 5+ stable enough; ideally Phase 9 feedback addressed for blockers  
+**Status:** Thin ship path ready (host credentials + live smoke still on you)  
+**Depends on:** Phase 5+ stable enough; Phase 6 reliability recommended  
 **Unblocks:** real users / next iteration  
 **Primary owners:** fullstack / devops-lite
 
@@ -25,37 +25,38 @@ Do not freeze infrastructure choices before local multiplayer works — by this 
 
 ---
 
-## Expected structure / ops notes
+## Repo pieces (thin)
 
 ```text
-apps/client/          → static host (e.g. Vercel, Netlify, Cloudflare Pages)
-apps/server/          → Node host with WebSocket support
-                      (e.g. Fly.io, Railway, Render, etc.)
-docs/
-└── DEPLOYMENT.md     # env vars, commands, URLs, caveats
+Dockerfile                 # server image (repo root)
+fly.toml                   # Fly.io server (min 1 machine, no auto-stop)
+apps/server/.env.example
+apps/client/.env.example
+apps/client/.env.production.example
+docs/DEPLOYMENT.md         # runbook — follow this
 ```
 
 ### Suggested split
 
 | Piece | Hosting style |
 |-------|----------------|
-| Client | Static frontend |
+| Client | Static frontend (`apps/client/dist`) |
 | Server | Long-lived Node process (Socket.IO) |
 
 Avoid “serverless only” hosts that don’t fit sticky WebSocket sessions unless you know what you’re doing.
 
 ---
 
-## What to build
+## What is in repo
 
 | Item | Detail |
 |------|--------|
-| Env config | `VITE_SERVER_URL` (or equivalent); server `PORT`, CORS origins |
-| Production build | Client build + server start scripts |
-| CORS / origins | Allow the real client origin |
-| Health check | Simple HTTP health route helps hosts |
-| Docs | Deploy steps + “how to verify a room works in prod” |
-| Monitoring lite | At least logs; fancy APM optional |
+| Env config | `VITE_SERVER_URL`; server `PORT` / `HOST` / `CLIENT_ORIGIN` (comma-separated) |
+| Production start | `npm run start:server` (tsx); Docker `CMD` same |
+| CORS / origins | Allowlisted via `CLIENT_ORIGIN` |
+| Health check | `GET /health` |
+| Docs | [`docs/DEPLOYMENT.md`](../DEPLOYMENT.md) |
+| Fly | `fly.toml` keeps one warm machine (in-memory rooms) |
 
 ---
 
@@ -80,23 +81,13 @@ Avoid “serverless only” hosts that don’t fit sticky WebSocket sessions unl
 
 ---
 
-## Team expectations
-
-| Role | Focus |
-|------|--------|
-| Deployer | Host setup, env, DNS |
-| Backend | Socket.IO prod settings, CORS |
-| Frontend | Correct server URL per environment |
-| Reviewer | Smoke test on the live URL, not only localhost |
-
----
-
 ## Definition of Done
 
-- [ ] Teammates can play from the deployed URLs without local servers
-- [ ] `docs/DEPLOYMENT.md` (or README section) is accurate
-- [ ] Known limits documented (single server memory rooms, no persistence, etc.)
-- [ ] Rollback path known (redeploy previous image/build)
+- [x] Deploy runbook + Docker/Fly skeleton in repo
+- [x] Env examples for client + server
+- [ ] Teammates can play from the deployed URLs without local servers *(after you run fly deploy + static publish)*
+- [x] `docs/DEPLOYMENT.md` documents limits + rollback
+- [x] Known limits documented (single server memory rooms, no persistence, etc.)
 
 ---
 
