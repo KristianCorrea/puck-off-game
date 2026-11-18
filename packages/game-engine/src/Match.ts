@@ -167,6 +167,21 @@ export class Match {
     return this.getState();
   }
 
+  /** Force MATCH_END for disconnect/leave abandon (Phase 6). */
+  abandon(winner: PlayerId): MatchState {
+    const world = this.requireWorld();
+    this.phase = "MATCH_END";
+    this.result = winner;
+    this.turnRemainingMs = 0;
+    Body.setVelocity(world.ball, { x: 0, y: 0 });
+    Body.setAngularVelocity(world.ball, 0);
+    for (const puck of world.pucks) {
+      Body.setVelocity(puck.body, { x: 0, y: 0 });
+      Body.setAngularVelocity(puck.body, 0);
+    }
+    return this.getState();
+  }
+
   /**
    * Validate + apply impulse. Does not settle — call step() each frame
    * (or settle() for tests / headless batch).

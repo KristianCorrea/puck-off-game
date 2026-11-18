@@ -3,6 +3,7 @@ import {
   SOCKET_EVENTS,
   type JoinRoomPayload,
   type LaunchPuckPayload,
+  type ReconnectRoomPayload,
 } from "@puck-off/shared";
 import type { RoomManager } from "../rooms/RoomManager";
 
@@ -10,31 +11,73 @@ import type { RoomManager } from "../rooms/RoomManager";
 export function bindSocketHandlers(io: Server, rooms: RoomManager): void {
   io.on("connection", (socket: Socket) => {
     socket.on(SOCKET_EVENTS.CREATE_ROOM, () => {
-      rooms.createRoom(socket);
+      try {
+        rooms.createRoom(socket);
+      } catch (err) {
+        console.error("[server] CREATE_ROOM", err);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: "Server error" });
+      }
     });
 
     socket.on(SOCKET_EVENTS.JOIN_ROOM, (payload: JoinRoomPayload) => {
-      rooms.joinRoom(socket, payload);
+      try {
+        rooms.joinRoom(socket, payload);
+      } catch (err) {
+        console.error("[server] JOIN_ROOM", err);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: "Server error" });
+      }
+    });
+
+    socket.on(SOCKET_EVENTS.RECONNECT_ROOM, (payload: ReconnectRoomPayload) => {
+      try {
+        rooms.reconnect(socket, payload);
+      } catch (err) {
+        console.error("[server] RECONNECT_ROOM", err);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: "Server error" });
+      }
     });
 
     socket.on(SOCKET_EVENTS.READY, () => {
-      rooms.ready(socket);
+      try {
+        rooms.ready(socket);
+      } catch (err) {
+        console.error("[server] READY", err);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: "Server error" });
+      }
     });
 
     socket.on(SOCKET_EVENTS.LAUNCH_PUCK, (payload: LaunchPuckPayload) => {
-      rooms.launch(socket, payload);
+      try {
+        rooms.launch(socket, payload);
+      } catch (err) {
+        console.error("[server] LAUNCH_PUCK", err);
+        socket.emit(SOCKET_EVENTS.REJECT_LAUNCH, { reason: "SERVER_ERROR" });
+      }
     });
 
     socket.on(SOCKET_EVENTS.REMATCH, () => {
-      rooms.rematch(socket);
+      try {
+        rooms.rematch(socket);
+      } catch (err) {
+        console.error("[server] REMATCH", err);
+        socket.emit(SOCKET_EVENTS.ERROR, { message: "Server error" });
+      }
     });
 
     socket.on(SOCKET_EVENTS.LEAVE_ROOM, () => {
-      rooms.leave(socket);
+      try {
+        rooms.leave(socket);
+      } catch (err) {
+        console.error("[server] LEAVE_ROOM", err);
+      }
     });
 
     socket.on("disconnect", () => {
-      rooms.onDisconnect(socket);
+      try {
+        rooms.onDisconnect(socket);
+      } catch (err) {
+        console.error("[server] disconnect", err);
+      }
     });
   });
 }

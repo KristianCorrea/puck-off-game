@@ -314,6 +314,12 @@ export class MatchHud {
       return;
     }
 
+    if (this.statusHint) {
+      this.turnText.setColor("#fbbf24");
+      this.turnText.setText(this.statusHint);
+      return;
+    }
+
     if (this.online) {
       const mine = turn.current === this.online.myPlayerId;
       const p = MATCH_CONFIG.players[turn.current];

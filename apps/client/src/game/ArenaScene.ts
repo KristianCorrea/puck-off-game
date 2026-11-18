@@ -118,6 +118,7 @@ export class ArenaScene extends Phaser.Scene {
         ball,
         socket: lobby.socket,
         playerId: lobby.playerId,
+        roomCode: lobby.code,
         matchStart: lobby.matchStart,
         onRematch: () => this.queueRematch(),
         onLeave: () => this.leaveOnline(),
@@ -144,7 +145,12 @@ export class ArenaScene extends Phaser.Scene {
   private leaveOnline(): void {
     this.match?.destroy();
     this.match = null;
-    sessionStorage.removeItem("puckoff-play-mode");
+    try {
+      sessionStorage.removeItem("puckoff-resume");
+      sessionStorage.removeItem("puckoff-play-mode");
+    } catch {
+      // ignore
+    }
     window.location.assign(window.location.pathname);
   }
 }

@@ -4,6 +4,7 @@ import {
   type LaunchAction,
   type MatchState,
   type PhysicsKeyframe,
+  type PlayerId,
   type TurnResolvedPayload,
 } from "@puck-off/shared";
 
@@ -67,6 +68,11 @@ export class MatchManager {
     if (!this.match) return null;
     const state = this.match.skipTurn();
     return toTurnResolved(state, "timeout");
+  }
+
+  abandon(winner: PlayerId): MatchState | null {
+    if (!this.match) return null;
+    return this.match.abandon(winner);
   }
 }
 

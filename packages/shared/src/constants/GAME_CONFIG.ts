@@ -73,6 +73,11 @@ export const MATCH_CONFIG = {
   goalCelebrationMs: 5_000,
   /** Shared 3-2-1 before MATCH_START (online). */
   countdownSeconds: 3,
+  /**
+   * After a mid-match disconnect, wait this long before abandon (opponent wins).
+   * Intentional LEAVE_ROOM skips the window.
+   */
+  reconnectWindowMs: 30_000,
   goalEjectFieldRatio: 0.187,
   /** Fixed Matter step for headless sim (ms). */
   fixedStepMs: 1000 / 60,

@@ -15,6 +15,7 @@ export const SOCKET_EVENTS = {
   LAUNCH_PUCK: "LAUNCH_PUCK",
   REMATCH: "REMATCH",
   LEAVE_ROOM: "LEAVE_ROOM",
+  RECONNECT_ROOM: "RECONNECT_ROOM",
 
   // Server → client
   ROOM_CREATED: "ROOM_CREATED",
@@ -22,8 +23,11 @@ export const SOCKET_EVENTS = {
   PLAYER_JOINED: "PLAYER_JOINED",
   COUNTDOWN: "COUNTDOWN",
   MATCH_START: "MATCH_START",
+  MATCH_RESUME: "MATCH_RESUME",
   TURN_RESOLVED: "TURN_RESOLVED",
   REJECT_LAUNCH: "REJECT_LAUNCH",
+  OPPONENT_DISCONNECTED: "OPPONENT_DISCONNECTED",
+  MATCH_ABANDONED: "MATCH_ABANDONED",
   ERROR: "ERROR",
 } as const;
 
@@ -51,11 +55,17 @@ export type LaunchPuckPayload = {
 
 export type RematchPayload = Record<string, never>;
 
+export type ReconnectRoomPayload = {
+  code: string;
+  resumeToken: string;
+};
+
 // ── Server → client payloads ───────────────────────────────────────────
 
 export type RoomCreatedPayload = {
   code: string;
   playerId: PlayerId;
+  resumeToken: string;
 };
 
 export type RoomPlayerInfo = {
@@ -69,6 +79,9 @@ export type RoomStatePayload = {
   players: RoomPlayerInfo[];
   phase: "lobby" | "countdown" | "playing" | "ended";
   yourPlayerId: PlayerId | null;
+  resumeToken: string | null;
+  /** True while waiting for a disconnected seat to reconnect. */
+  pausedForDisconnect?: boolean;
 };
 
 export type PlayerJoinedPayload = {
@@ -87,6 +100,14 @@ export type MatchStartPayload = {
   state: MatchState;
 };
 
+export type MatchResumePayload = {
+  code: string;
+  playerId: PlayerId;
+  state: MatchState;
+  /** Remaining reconnect grace for the other seat, if any. */
+  opponentReconnectMs?: number;
+};
+
 /**
  * Authoritative end-of-shot (or skip) snapshot.
  * Prefer `state` as the full MatchState; flat fields mirror the phase guide.
@@ -100,7 +121,7 @@ export type TurnResolvedPayload = {
   winner: MatchResult;
   remainingTimeMs: number;
   /** Why this resolve happened */
-  reason: "launch" | "timeout" | "rematch";
+  reason: "launch" | "timeout" | "rematch" | "abandon";
   /**
    * Server-authored shot path for both clients to replay.
    * Empty for timeout/rematch (snap to `state` only).
@@ -112,6 +133,20 @@ export type TurnResolvedPayload = {
 
 export type RejectLaunchPayload = {
   reason: string;
+};
+
+export type OpponentDisconnectedPayload = {
+  code: string;
+  playerId: PlayerId;
+  reconnectMs: number;
+};
+
+export type MatchAbandonedPayload = {
+  code: string;
+  reason: "disconnect_timeout" | "leave";
+  disconnectedPlayerId: PlayerId;
+  winner: PlayerId;
+  state: MatchState;
 };
 
 export type ErrorPayload = {

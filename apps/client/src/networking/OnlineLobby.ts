@@ -2,11 +2,17 @@ import type { Socket } from "socket.io-client";
 import {
   SOCKET_EVENTS,
   type CountdownPayload,
+  type MatchResumePayload,
   type MatchStartPayload,
   type PlayerId,
   type RoomCreatedPayload,
   type RoomStatePayload,
 } from "@puck-off/shared";
+import {
+  clearResumeSession,
+  loadResumeSession,
+  saveResumeSession,
+} from "./resumeSession";
 import { connectSocket, getServerUrl } from "./socket";
 
 export type OnlineLobbyResult = {
@@ -17,7 +23,8 @@ export type OnlineLobbyResult = {
 };
 
 /**
- * Minimal DOM lobby: create / join / ready / countdown. Resolves on MATCH_START.
+ * Minimal DOM lobby: create / join / ready / countdown / reconnect.
+ * Resolves on MATCH_START or MATCH_RESUME.
  */
 export function runOnlineLobby(): Promise<OnlineLobbyResult> {
   return new Promise((resolve, reject) => {
@@ -77,10 +84,31 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     let roomCode: string | null = null;
     let settled = false;
 
+    const persistResume = (token: string | null | undefined): void => {
+      if (!myPlayerId || !roomCode || !token) return;
+      saveResumeSession({
+        code: roomCode,
+        playerId: myPlayerId,
+        resumeToken: token,
+      });
+    };
+
     const cleanupUi = (): void => {
       root.classList.remove("is-visible");
       root.setAttribute("aria-hidden", "true");
       setCountdown(null);
+    };
+
+    const finish = (payload: MatchStartPayload): void => {
+      if (settled || !myPlayerId || !roomCode) return;
+      settled = true;
+      cleanupUi();
+      resolve({
+        socket,
+        playerId: myPlayerId,
+        code: roomCode,
+        matchStart: payload,
+      });
     };
 
     const fail = (message: string): void => {
@@ -89,6 +117,16 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     };
 
     socket.on("connect", () => {
+      const resume = loadResumeSession();
+      if (resume) {
+        setStatus(`Reconnecting to ${resume.code}…`);
+        setLobbyControlsEnabled(false);
+        socket.emit(SOCKET_EVENTS.RECONNECT_ROOM, {
+          code: resume.code,
+          resumeToken: resume.resumeToken,
+        });
+        return;
+      }
       setStatus("Connected. Create or join a room.");
     });
 
@@ -97,13 +135,24 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     });
 
     socket.on(SOCKET_EVENTS.ERROR, (payload: { message?: string }) => {
-      fail(payload?.message ?? "Server error");
+      const msg = payload?.message ?? "Server error";
+      // Stale resume token — clear and let them create/join.
+      if (
+        msg.toLowerCase().includes("resume") ||
+        msg.toLowerCase().includes("not found") ||
+        msg.toLowerCase().includes("reconnect")
+      ) {
+        clearResumeSession();
+        setLobbyControlsEnabled(true);
+      }
+      fail(msg);
     });
 
     socket.on(SOCKET_EVENTS.ROOM_CREATED, (payload: RoomCreatedPayload) => {
       myPlayerId = payload.playerId;
       roomCode = payload.code;
       if (codeEl) codeEl.textContent = payload.code;
+      persistResume(payload.resumeToken);
       setStatus(`Room ${payload.code} — waiting for opponent, then Ready.`);
       readyBtn?.removeAttribute("disabled");
       leaveBtn?.removeAttribute("disabled");
@@ -113,6 +162,8 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       myPlayerId = payload.yourPlayerId ?? myPlayerId;
       roomCode = payload.code;
       if (codeEl) codeEl.textContent = payload.code;
+      persistResume(payload.resumeToken);
+
       const p1 = payload.players.find((p) => p.playerId === "player1");
       const p2 = payload.players.find((p) => p.playerId === "player2");
       const seatLine = `P1 ${p1?.connected ? (p1.ready ? "ready" : "in") : "—"} · P2 ${p2?.connected ? (p2.ready ? "ready" : "in") : "—"}`;
@@ -148,20 +199,19 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
     });
 
     socket.on(SOCKET_EVENTS.MATCH_START, (payload: MatchStartPayload) => {
-      if (settled || !myPlayerId || !roomCode) return;
-      settled = true;
-      cleanupUi();
-      resolve({
-        socket,
-        playerId: myPlayerId,
-        code: roomCode,
-        matchStart: payload,
-      });
+      finish(payload);
+    });
+
+    socket.on(SOCKET_EVENTS.MATCH_RESUME, (payload: MatchResumePayload) => {
+      myPlayerId = payload.playerId;
+      roomCode = payload.code;
+      finish({ code: payload.code, state: payload.state });
     });
 
     createBtn?.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      clearResumeSession();
       socket.emit(SOCKET_EVENTS.CREATE_ROOM);
       setStatus("Creating room…");
     });
@@ -174,6 +224,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
         setStatus("Enter a room code");
         return;
       }
+      clearResumeSession();
       socket.emit(SOCKET_EVENTS.JOIN_ROOM, { code });
       setStatus(`Joining ${code.toUpperCase()}…`);
       readyBtn?.removeAttribute("disabled");
@@ -191,6 +242,7 @@ export function runOnlineLobby(): Promise<OnlineLobbyResult> {
       e.preventDefault();
       e.stopPropagation();
       if (settled) return;
+      clearResumeSession();
       socket.emit(SOCKET_EVENTS.LEAVE_ROOM);
       socket.disconnect();
       sessionStorage.removeItem("puckoff-play-mode");
