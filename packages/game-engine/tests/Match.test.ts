@@ -174,4 +174,42 @@ describe("Match engine", () => {
     expect(after.position.y).not.toBeCloseTo(before.position.y, 1);
     match.destroy();
   });
+
+  it("rejects a second launch while physics is resolving", () => {
+    const match = new Match();
+    match.start();
+    const first = match.applyAction({
+      playerId: "player1",
+      puckId: "p1_1",
+      angle: 0,
+      power: 0.5,
+    });
+    expect(first.ok).toBe(true);
+    const second = match.applyAction({
+      playerId: "player1",
+      puckId: "p1_2",
+      angle: 0,
+      power: 0.5,
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.reason).toBe("WRONG_PHASE");
+    match.destroy();
+  });
+
+  it("abandon forces MATCH_END for the given winner", () => {
+    const match = new Match();
+    match.start();
+    const state = match.abandon("player2");
+    expect(state.phase).toBe("MATCH_END");
+    expect(state.result).toBe("player2");
+    const blocked = match.applyAction({
+      playerId: "player1",
+      puckId: "p1_1",
+      angle: 0,
+      power: 0.5,
+    });
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.reason).toBe("MATCH_ENDED");
+    match.destroy();
+  });
 });

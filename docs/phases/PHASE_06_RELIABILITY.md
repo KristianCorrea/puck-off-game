@@ -1,8 +1,8 @@
 # Phase 6 — Reliability
 
-**Status:** Hardening  
+**Status:** Hardening complete (MVP policy locked)  
 **Depends on:** Phase 5 (happy-path online match)  
-**Unblocks:** Phase 7 (UI polish on a stable core)  
+**Unblocks:** Phase 7 (UI polish on a stable core) / Phase 10 deploy  
 **Primary owners:** backend / QA
 
 ---
@@ -26,27 +26,38 @@ The server must reject garbage without crashing or desyncing the honest client.
 
 ---
 
-## Expected structure (end of Phase 6)
-
-Mostly reinforcement of Phase 4–5 code:
+## Structure
 
 ```text
 apps/server/src/
-├── networking/validation.ts       # harden
+├── networking/validation.ts       # LAUNCH_PUCK parse / clamps
+├── networking/events.ts           # try/catch around handlers
 ├── matches/
 │   ├── MatchManager.ts
-│   ├── disconnectPolicy.ts        # reconnect window + abandon
-│   └── actionGuard.ts             # idempotency / duplicate launch
+│   ├── disconnectPolicy.ts        # reconnect window + opponent_wins
+│   └── actionGuard.ts             # duplicate launch gate
 apps/client/src/
 ├── networking/
-│   ├── reconcile.ts
-│   └── optimisticLaunch.ts        # cancel/restore local Match playback on reject
-└── ...
+│   ├── resumeSession.ts           # sessionStorage resume token
+│   └── OnlineLobby.ts             # RECONNECT_ROOM on boot
+└── game/match/OnlineMatchController.ts
 packages/game-engine/
-└── tests/                         # expand edge-case coverage
+└── Match.abandon()                # force MATCH_END
 ```
 
-Keep disconnect/abandon behavior **isolated** so policy can change later.
+---
+
+## Locked abandon policy
+
+| Case | Behavior |
+|------|----------|
+| Soft disconnect mid-match | Pause turns/launches; `OPPONENT_DISCONNECTED`; **30s** reconnect window |
+| Reconnect in window | `RECONNECT_ROOM` + `MATCH_RESUME` with authoritative state |
+| Window expires | Remaining player **wins** (`MATCH_ABANDONED` + `TURN_RESOLVED` reason `abandon`) |
+| Intentional `LEAVE_ROOM` mid-match | Immediate abandon — opponent wins (no wait) |
+| Disconnect in lobby | Free seat only |
+| Disconnect during countdown | Cancel countdown → lobby for remaining player |
+| Refresh mid-match | Resume via `sessionStorage` resume token (same browser tab session) |
 
 ---
 
@@ -54,76 +65,52 @@ Keep disconnect/abandon behavior **isolated** so policy can change later.
 
 ### Actions / validation
 
-- [ ] Duplicate click / double `LAUNCH_PUCK`
-- [ ] Action during `PHYSICS_RESOLUTION`
-- [ ] Action during opponent’s turn
-- [ ] Action after `MATCH_END`
-- [ ] Selecting / launching opponent puck
-- [ ] Invalid puck ID
-- [ ] Invalid power (<0, >1, NaN)
-- [ ] Invalid angle (NaN / non-finite)
-- [ ] Join when room is full
-- [ ] Leave before match starts
+- [x] Duplicate click / double `LAUNCH_PUCK` → `DUPLICATE_LAUNCH` / `WRONG_PHASE`
+- [x] Action during `PHYSICS_RESOLUTION` → engine `WRONG_PHASE`
+- [x] Action during opponent’s turn → `WRONG_TURN`
+- [x] Action after `MATCH_END` → `MATCH_ENDED` / room `WRONG_PHASE`
+- [x] Selecting / launching opponent puck → `NOT_OWNER` (engine + client filter)
+- [x] Invalid puck ID → `INVALID_PUCK_ID` / `UNKNOWN_PUCK`
+- [x] Invalid power (<min, >1, NaN) → `INVALID_POWER`
+- [x] Invalid angle (NaN / non-finite) → `INVALID_ANGLE`
+- [x] Join when room is full → ERROR "Room is full"
+- [x] Leave before match starts → seat freed; room kept for remaining
 
 ### Network / session
 
-- [ ] High latency (throttle in DevTools)
-- [ ] Temporary disconnect + reconnect within window
-- [ ] Disconnect during match past window → abandon rule fires
-- [ ] Refresh mid-match behavior (documented: reconnect or forfeit)
+- [x] Temporary disconnect + reconnect within window → `MATCH_RESUME`
+- [x] Disconnect during match past window → abandon, opponent wins
+- [x] Refresh mid-match → reconnect with stored resume token
+- [ ] High latency (throttle in DevTools) — **deferred playtest** (keyframe replay already hides dual-sim)
 
 ### Rules still correct under stress
 
-- [ ] Own goal scoring
-- [ ] After goal: ball midfield + pucks reset to start layout
-- [ ] Turn timer skip under latency
-- [ ] Rejected shot restores shooter local state
+- [x] Own goal scoring (engine)
+- [x] After goal: ball midfield + pucks reset (engine `handleGoal`)
+- [x] Turn timer skip paused while opponent disconnected / replay lock
+- [x] Rejected shot restores shooter local state (`preShotState`)
 
 ---
 
-## What to build
+## Known sharp edges (ok for Phase 7 / playtest)
 
-| Item | Detail |
-|------|--------|
-| Action guards | Phase + turn + ownership + numeric clamps |
-| Idempotency | Duplicate launch doesn’t double-apply |
-| Reject message | Client gets a clear failure → cancel local playback |
-| Reconnect | Short pause/wait; resume with authoritative state snapshot |
-| Abandon | Isolated policy (e.g. opponent wins / draw / void — pick one, document it) |
-
----
-
-## What NOT to build
-
-- New modes or economy
-- Perfect rollback netcode
-- Spectator mode
-- Fancy reconnect UX animations (functional first)
-- Changing core physics feel “to fix flaky tests” without evidence
-
----
-
-## Team expectations
-
-| Role | Focus |
-|------|--------|
-| QA | Run the matrix; file repros |
-| Backend | Make invalid paths boring and safe |
-| Client | Reconcile / cancel local engine playback |
-| Reviewer | Require matrix notes in the PR or a checklist comment |
+- Resume tokens are per-browser `sessionStorage` — new device cannot steal a seat
+- Both players disconnecting deletes the room (no spectate / archive)
+- Countdown disconnect cancels start (no 30s hold during 3-2-1)
+- No ranked / accounts
 
 ---
 
 ## Definition of Done
 
-- [ ] Matrix items checked or explicitly ticketed with reason
-- [ ] Server never trusts client score/timer/winner
-- [ ] No crash on malformed events
-- [ ] Reconnect window behaves as documented
-- [ ] Team comfortable inviting outsiders without “don’t click twice” warnings
+- [x] Matrix items checked or explicitly ticketed with reason
+- [x] Server never trusts client score/timer/winner
+- [x] No crash on malformed events (handler try/catch + parse guards)
+- [x] Reconnect window behaves as documented
+- [x] Team comfortable inviting outsiders without “don’t click twice” warnings
 
 ---
 
-## Handoff to Phase 7
+## Handoff to Phase 7 / 10
 
-Core is stable enough that UI work won’t paper over desync bugs. Call out any remaining “known sharp edges” in the phase README or tickets.
+Core is stable enough that UI work won’t paper over desync bugs. Next: optional Phase 7 lobby chrome, or Phase 10 deploy (`VITE_SERVER_URL`, `CLIENT_ORIGIN`, `docs/DEPLOYMENT.md`).

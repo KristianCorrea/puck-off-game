@@ -5,10 +5,13 @@ import {
   MATCH_CONFIG,
   SOCKET_EVENTS,
   type CountdownPayload,
+  type MatchAbandonedPayload,
   type MatchPhase,
   type MatchResult,
+  type MatchResumePayload,
   type MatchStartPayload,
   type MatchState,
+  type OpponentDisconnectedPayload,
   type PlayerId,
   type RejectLaunchPayload,
   type RoomStatePayload,
@@ -19,6 +22,10 @@ import type { GameAudio } from "../audio/GameAudio";
 import type { PuckEntity } from "../entities/createPuck";
 import { GameFx } from "../fx/GameFx";
 import { FlickController } from "../input/FlickController";
+import {
+  clearResumeSession,
+  loadResumeSession,
+} from "../../networking/resumeSession";
 import { KeyframeReplay } from "./KeyframeReplay";
 import { MatchHud, highlightActivePucks } from "./MatchHud";
 import { MatchTimer } from "./MatchTimer";
@@ -44,6 +51,7 @@ export class OnlineMatchController {
   private readonly ball: BallEntity;
   private readonly socket: Socket;
   private readonly myPlayerId: PlayerId;
+  private readonly roomCode: string;
   private readonly flick: FlickController;
   private readonly hud: MatchHud;
   private readonly fx: GameFx;
@@ -58,6 +66,8 @@ export class OnlineMatchController {
   private pendingAuthority: MatchState | null = null;
   private preShotState: MatchState | null = null;
   private destroyed = false;
+  private pausedForDisconnect = false;
+  private selfDisconnected = false;
   private readonly onLeave: () => void;
 
   constructor(opts: {
@@ -67,6 +77,7 @@ export class OnlineMatchController {
     ball: BallEntity;
     socket: Socket;
     playerId: PlayerId;
+    roomCode: string;
     matchStart: MatchStartPayload;
     onRematch: () => void;
     onLeave: () => void;
@@ -77,6 +88,7 @@ export class OnlineMatchController {
     this.ball = opts.ball;
     this.socket = opts.socket;
     this.myPlayerId = opts.playerId;
+    this.roomCode = opts.roomCode;
     this.onLeave = opts.onLeave;
 
     this.engine = new Match();
@@ -132,6 +144,7 @@ export class OnlineMatchController {
         this.timer.stop();
         this.flick.setEnabled(false);
         this.fx.resetMotionTracking();
+        this.hud.setStatusHint(null);
 
         this.socket.emit(SOCKET_EVENTS.LAUNCH_PUCK, {
           puckId: puck.id,
@@ -153,9 +166,14 @@ export class OnlineMatchController {
     this.socket.off(SOCKET_EVENTS.TURN_RESOLVED, this.onTurnResolved);
     this.socket.off(SOCKET_EVENTS.REJECT_LAUNCH, this.onRejectLaunch);
     this.socket.off(SOCKET_EVENTS.MATCH_START, this.onMatchStart);
+    this.socket.off(SOCKET_EVENTS.MATCH_RESUME, this.onMatchResume);
     this.socket.off(SOCKET_EVENTS.COUNTDOWN, this.onCountdown);
     this.socket.off(SOCKET_EVENTS.ROOM_STATE, this.onRoomState);
+    this.socket.off(SOCKET_EVENTS.OPPONENT_DISCONNECTED, this.onOpponentDisconnected);
+    this.socket.off(SOCKET_EVENTS.MATCH_ABANDONED, this.onMatchAbandoned);
     this.socket.off(SOCKET_EVENTS.ERROR, this.onError);
+    this.socket.off("disconnect", this.onSocketDisconnect);
+    this.socket.off("connect", this.onSocketConnect);
     this.flick.destroy();
     this.hud.destroy();
     this.fx.destroy();
@@ -177,6 +195,7 @@ export class OnlineMatchController {
 
   leave(): void {
     if (this.destroyed) return;
+    clearResumeSession();
     this.socket.emit(SOCKET_EVENTS.LEAVE_ROOM);
     this.socket.disconnect();
     this.onLeave();
@@ -189,7 +208,9 @@ export class OnlineMatchController {
     if (
       this.phase === "PLAYER_TURN" &&
       !this.awaitingResolve &&
-      !this.replay
+      !this.replay &&
+      !this.pausedForDisconnect &&
+      !this.selfDisconnected
     ) {
       this.timer.remainingMs = Math.max(0, this.timer.remainingMs - deltaMs);
       this.timer.running = true;
@@ -209,6 +230,8 @@ export class OnlineMatchController {
       this.phase === "PLAYER_TURN" &&
       !this.awaitingResolve &&
       !this.replay &&
+      !this.pausedForDisconnect &&
+      !this.selfDisconnected &&
       this.turns.current === this.myPlayerId
     );
   }
@@ -217,10 +240,33 @@ export class OnlineMatchController {
     this.socket.on(SOCKET_EVENTS.TURN_RESOLVED, this.onTurnResolved);
     this.socket.on(SOCKET_EVENTS.REJECT_LAUNCH, this.onRejectLaunch);
     this.socket.on(SOCKET_EVENTS.MATCH_START, this.onMatchStart);
+    this.socket.on(SOCKET_EVENTS.MATCH_RESUME, this.onMatchResume);
     this.socket.on(SOCKET_EVENTS.COUNTDOWN, this.onCountdown);
     this.socket.on(SOCKET_EVENTS.ROOM_STATE, this.onRoomState);
+    this.socket.on(SOCKET_EVENTS.OPPONENT_DISCONNECTED, this.onOpponentDisconnected);
+    this.socket.on(SOCKET_EVENTS.MATCH_ABANDONED, this.onMatchAbandoned);
     this.socket.on(SOCKET_EVENTS.ERROR, this.onError);
+    this.socket.on("disconnect", this.onSocketDisconnect);
+    this.socket.on("connect", this.onSocketConnect);
   }
+
+  private onSocketDisconnect = (): void => {
+    if (this.destroyed) return;
+    this.selfDisconnected = true;
+    this.flick.setEnabled(false);
+    this.hud.setStatusHint("Disconnected — reconnecting…");
+  };
+
+  private onSocketConnect = (): void => {
+    if (this.destroyed) return;
+    const resume = loadResumeSession();
+    if (!resume || resume.code !== this.roomCode) return;
+    this.hud.setStatusHint("Rejoining match…");
+    this.socket.emit(SOCKET_EVENTS.RECONNECT_ROOM, {
+      code: resume.code,
+      resumeToken: resume.resumeToken,
+    });
+  };
 
   private onTurnResolved = (payload: TurnResolvedPayload): void => {
     if (this.destroyed) return;
@@ -232,6 +278,13 @@ export class OnlineMatchController {
     this.awaitingResolve = false;
     this.preShotState = null;
     this.pendingAuthority = null;
+    this.pausedForDisconnect = false;
+    this.hud.setStatusHint(null);
+
+    if (payload.reason === "abandon") {
+      this.finishWithAuthority(payload.state, { scored: false });
+      return;
+    }
 
     const frames = payload.keyframes ?? [];
     if (payload.reason === "launch" && frames.length > 0) {
@@ -240,12 +293,10 @@ export class OnlineMatchController {
       this.phase = "PHYSICS_RESOLUTION";
       this.timer.stop();
       this.flick.setEnabled(false);
-      // Seed first pose immediately.
       this.updateReplay(0);
       return;
     }
 
-    // Timeout / rematch / empty keyframes — snap.
     this.finishWithAuthority(payload.state, {
       scored:
         payload.state.score.player1 !== this.score.player1 ||
@@ -282,6 +333,8 @@ export class OnlineMatchController {
     this.preShotState = null;
     this.goalPauseMs = 0;
     this.turnAnnounce = false;
+    this.pausedForDisconnect = false;
+    this.selfDisconnected = false;
     this.hud.setCountdown(null);
     this.hud.setStatusHint(null);
     this.hud.stopGoalCelebration();
@@ -289,12 +342,110 @@ export class OnlineMatchController {
     this.enterPlayerTurnFromState(payload.state);
   };
 
+  private onMatchResume = (payload: MatchResumePayload): void => {
+    if (this.destroyed) return;
+    this.selfDisconnected = false;
+    this.pausedForDisconnect = Boolean(
+      payload.opponentReconnectMs && payload.opponentReconnectMs > 0,
+    );
+    this.awaitingResolve = false;
+    this.replay = null;
+    this.pendingAuthority = null;
+    this.preShotState = null;
+    this.goalPauseMs = 0;
+    this.hud.setCountdown(null);
+    this.hud.stopGoalCelebration();
+    this.hud.setStatusHint(
+      this.pausedForDisconnect
+        ? `Opponent reconnecting (${Math.ceil((payload.opponentReconnectMs ?? 0) / 1000)}s)…`
+        : null,
+    );
+    this.applyAuthority(payload.state);
+    if (payload.state.phase === "MATCH_END") {
+      this.flick.setEnabled(false);
+      return;
+    }
+    if (payload.state.phase === "PLAYER_TURN" && !this.pausedForDisconnect) {
+      this.enterPlayerTurnFromState(payload.state);
+    } else {
+      this.flick.setEnabled(false);
+    }
+  };
+
+  private onOpponentDisconnected = (
+    payload: OpponentDisconnectedPayload,
+  ): void => {
+    if (this.destroyed) return;
+    if (payload.playerId === this.myPlayerId) return;
+    this.pausedForDisconnect = true;
+    this.flick.setEnabled(false);
+    this.timer.stop();
+    this.hud.setStatusHint(
+      `Opponent disconnected — ${Math.ceil(payload.reconnectMs / 1000)}s to return`,
+    );
+  };
+
+  private onMatchAbandoned = (payload: MatchAbandonedPayload): void => {
+    if (this.destroyed) return;
+    this.pausedForDisconnect = false;
+    this.selfDisconnected = false;
+    this.awaitingResolve = false;
+    this.replay = null;
+    this.pendingAuthority = null;
+    this.hud.setCountdown(null);
+    this.hud.setStatusHint(
+      payload.reason === "leave"
+        ? "Opponent left — match over"
+        : "Opponent timed out — match over",
+    );
+    this.finishWithAuthority(payload.state, { scored: false });
+  };
+
   private onRoomState = (payload: RoomStatePayload): void => {
     if (this.destroyed) return;
-    // Opponent left mid-match / countdown — bounce out of the session.
-    if (payload.phase === "lobby") {
-      this.hud.setStatusHint("Opponent left");
-      this.leave();
+
+    if (payload.resumeToken) {
+      // keep token fresh via lobby helper path — mirrored here for mid-match
+      try {
+        const raw = sessionStorage.getItem("puckoff-resume");
+        const prev = raw ? (JSON.parse(raw) as { code?: string }) : null;
+        if (prev?.code === payload.code || !prev) {
+          sessionStorage.setItem(
+            "puckoff-resume",
+            JSON.stringify({
+              code: payload.code,
+              playerId: payload.yourPlayerId ?? this.myPlayerId,
+              resumeToken: payload.resumeToken,
+            }),
+          );
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (payload.pausedForDisconnect) {
+      this.pausedForDisconnect = true;
+      this.flick.setEnabled(false);
+      return;
+    }
+
+    // Opponent reconnected (or pause cleared).
+    if (this.pausedForDisconnect && !payload.pausedForDisconnect) {
+      this.pausedForDisconnect = false;
+      this.hud.setStatusHint(null);
+      const state = this.engine.getState();
+      if (state.phase === "PLAYER_TURN") {
+        this.enterPlayerTurnFromState(state);
+      }
+    }
+
+    // Countdown cancelled back to lobby before MATCH_START lived here —
+    // mid-match we only bounce if both seats emptied (room gone → ERROR).
+    if (payload.phase === "lobby" && this.phase !== "MATCH_END") {
+      this.hud.setStatusHint("Match cancelled — returning…");
+      clearResumeSession();
+      this.onLeave();
     }
   };
 
@@ -315,14 +466,12 @@ export class OnlineMatchController {
       return;
     }
 
-    // Replay finished.
     const scored = this.replay.scoredDuringReplay;
     const state = this.replay.authority;
     const freeze = this.replay.getFreezePose();
     this.replay = null;
 
     if (scored) {
-      // Keep ball-in-net on screen for the full celebration; reset after.
       this.paintReplayPose(freeze);
       this.pendingAuthority = state;
       this.score.player1 = state.score.player1;
@@ -398,7 +547,6 @@ export class OnlineMatchController {
     const pending = this.pendingAuthority;
     this.pendingAuthority = null;
     if (pending) {
-      // Now reset to midfield / next turn (or match end).
       this.applyAuthority(pending);
       if (pending.phase === "MATCH_END") {
         this.audio.playWin();
@@ -432,7 +580,10 @@ export class OnlineMatchController {
     this.timer.remainingMs = state.turnRemainingMs;
     this.timer.running = true;
     this.flick.setEnabled(
-      state.currentTurn === this.myPlayerId && state.phase === "PLAYER_TURN",
+      !this.pausedForDisconnect &&
+        !this.selfDisconnected &&
+        state.currentTurn === this.myPlayerId &&
+        state.phase === "PLAYER_TURN",
     );
     if (this.turnAnnounce) this.audio.playTurn();
     this.turnAnnounce = true;
@@ -456,6 +607,10 @@ export class OnlineMatchController {
   }
 
   private refreshUi(): void {
+    const awaiting =
+      (this.awaitingResolve && !this.replay) ||
+      this.pausedForDisconnect ||
+      this.selfDisconnected;
     this.hud.refresh({
       score: this.score,
       turn: this.turns,
@@ -463,7 +618,7 @@ export class OnlineMatchController {
       phase: this.phase,
       result: this.result,
       selectedPuckId: this.flick.selectedPuckId,
-      awaitingServer: this.awaitingResolve && !this.replay,
+      awaitingServer: awaiting,
     });
     highlightActivePucks(
       this.pucks,
