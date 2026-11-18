@@ -8,6 +8,10 @@ import {
   startServerHealthPolling,
   type ServerHealthStatus,
 } from "../networking/serverHealth";
+import {
+  installViewportRefresh,
+  refreshGameViewport,
+} from "./viewportRefresh";
 
 type OrientationLockType = "landscape" | "landscape-primary" | "landscape-secondary";
 
@@ -61,7 +65,7 @@ export async function enterPlayMode(): Promise<void> {
   window.dispatchEvent(new Event("puckoff-play-gesture"));
   await requestFullscreen();
   await lockLandscape();
-  window.dispatchEvent(new Event("resize"));
+  refreshGameViewport();
 }
 
 function setVisible(el: HTMLElement | null, visible: boolean): void {
@@ -96,12 +100,16 @@ function applyOnlineButtonStatus(
  * ONLINE stays disabled until GET /health succeeds (polled every 10s).
  */
 export function installPlayShell(): void {
+  installViewportRefresh();
+
   const tap = document.getElementById("tap-to-play");
+  const resume = document.getElementById("tap-to-resume");
   const rotate = document.getElementById("rotate-overlay");
   const localBtn = document.getElementById("play-local-btn");
   const onlineBtn = document.getElementById(
     "play-online-btn",
   ) as HTMLButtonElement | null;
+  const resumeBtn = document.getElementById("resume-play-btn");
 
   // Desktop with ?mode=… can skip the chooser; touch still needs a gesture.
   const params = new URLSearchParams(window.location.search);
@@ -116,6 +124,15 @@ export function installPlayShell(): void {
     setVisible(tap, !needRotate && !playStarted);
   };
 
+  const needRotateNow = (): boolean =>
+    isPortrait() && (isCoarsePointer() || window.innerWidth < 900);
+
+  const showResumeGate = (): void => {
+    if (!playStarted || !isCoarsePointer()) return;
+    if (needRotateNow()) return;
+    setVisible(resume, true);
+  };
+
   let stopHealthPoll: (() => void) | null = null;
 
   let entering = false;
@@ -128,6 +145,7 @@ export function installPlayShell(): void {
     setPlayMode(mode);
     playStarted = true;
     setVisible(tap, false);
+    setVisible(resume, false);
     await enterPlayMode();
     entering = false;
     syncOverlays();
@@ -153,6 +171,17 @@ export function installPlayShell(): void {
     { passive: false },
   );
 
+  resumeBtn?.addEventListener(
+    "click",
+    (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setVisible(resume, false);
+      void enterPlayMode();
+    },
+    { passive: false },
+  );
+
   // Gate ONLINE on server health while the mode chooser is visible.
   if (onlineBtn && !playStarted) {
     applyOnlineButtonStatus(onlineBtn, "checking");
@@ -168,5 +197,20 @@ export function installPlayShell(): void {
   syncOverlays();
   window.addEventListener("resize", syncOverlays);
   window.addEventListener("orientationchange", syncOverlays);
-  document.addEventListener("fullscreenchange", syncOverlays);
+  document.addEventListener("fullscreenchange", () => {
+    syncOverlays();
+    // Left fullscreen while playing (common after app switch on iOS).
+    if (playStarted && !isFullscreen() && isCoarsePointer()) {
+      showResumeGate();
+    }
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    syncOverlays();
+    if (playStarted && isCoarsePointer() && !needRotateNow()) {
+      // Always offer a tap so we can re-request fullscreen + force scale refresh.
+      showResumeGate();
+    }
+  });
 }

@@ -10,11 +10,16 @@ export function applyLetterboxCamera(scene: Phaser.Scene): void {
   const { width: worldW, height: worldH, backgroundColor } =
     PROTOTYPE_CONFIG.arena;
   const cam = scene.cameras.main;
-  const zoom = Math.min(cam.width / worldW, cam.height / worldH);
+  // Prefer Scale Manager size (updates on refresh); fall back to camera.
+  const viewW = scene.scale.width || cam.width;
+  const viewH = scene.scale.height || cam.height;
+  if (viewW < 2 || viewH < 2) return;
 
+  const zoom = Math.min(viewW / worldW, viewH / worldH);
   cam.setBackgroundColor(backgroundColor);
   cam.setZoom(zoom);
   cam.centerOn(worldW / 2, worldH / 2);
+  cam.setSize(viewW, viewH);
 }
 
 /** Re-apply letterboxing whenever the Scale Manager resizes the game. */

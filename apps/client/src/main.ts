@@ -2,6 +2,10 @@ import Phaser from "phaser";
 import { ArenaScene } from "./game/ArenaScene";
 import { PROTOTYPE_CONFIG } from "./game/config/prototypeConfig";
 import { installPlayShell } from "./mobile/playShell";
+import {
+  registerGameForViewportRefresh,
+  refreshGameViewport,
+} from "./mobile/viewportRefresh";
 import { getPlayMode, setPlayMode, type PlayMode } from "./networking/playMode";
 import { waitUntilServerOnline } from "./networking/serverHealth";
 
@@ -16,7 +20,7 @@ installPlayShell();
 const { width, height } = PROTOTYPE_CONFIG.arena;
 
 function startGame(): void {
-  new Phaser.Game({
+  const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,
     backgroundColor: "#050b12",
@@ -50,6 +54,12 @@ function startGame(): void {
       },
     },
     scene: [ArenaScene],
+  });
+
+  registerGameForViewportRefresh(game);
+  // First paint can race Safari chrome; refresh once the scene is up.
+  game.events.once(Phaser.Core.Events.READY, () => {
+    refreshGameViewport();
   });
 }
 
