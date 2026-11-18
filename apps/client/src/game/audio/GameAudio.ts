@@ -78,6 +78,15 @@ export class GameAudio {
     this.play(SFX.select, { volume: 0.35, rate: 1.05 });
   }
 
+  /** Quiet countdown tick (≤10s). Louder / higher as seconds drop. */
+  playTick(secondsLeft: number): void {
+    const urgency = 1 - Math.max(0, Math.min(10, secondsLeft)) / 10;
+    this.play(SFX.select, {
+      volume: 0.1 + urgency * 0.22,
+      rate: 1.2 + urgency * 0.55,
+    });
+  }
+
   playTurn(): void {
     this.play(SFX.turn, { volume: 0.4 });
   }

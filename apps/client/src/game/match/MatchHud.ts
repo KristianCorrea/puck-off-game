@@ -6,10 +6,12 @@ import {
 } from "../config/prototypeConfig";
 import type { MatchPhase, MatchResult, PlayerId } from "../config/gameConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
+import type { GameAudio } from "../audio/GameAudio";
 import { GoalCelebration } from "../ui/GoalCelebration";
 import type { ScoreKeeper } from "./ScoreKeeper";
 import type { MatchTimer } from "./MatchTimer";
 import type { TurnManager } from "./TurnManager";
+import { TurnPlate } from "./TurnPlate";
 
 const FONT = '"Nunito", system-ui, sans-serif';
 const DISPLAY = '"Teko", "Arial Narrow", Impact, sans-serif';
@@ -23,14 +25,9 @@ export class MatchHud {
   private readonly scene: Phaser.Scene;
   private readonly panel: Phaser.GameObjects.Graphics;
   private readonly brandText: Phaser.GameObjects.Text;
-  private readonly p1Chip: Phaser.GameObjects.Container;
-  private readonly p2Chip: Phaser.GameObjects.Container;
-  private readonly p1Name: Phaser.GameObjects.Text;
-  private readonly p2Name: Phaser.GameObjects.Text;
+  private readonly plates: Record<PlayerId, TurnPlate>;
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly turnText: Phaser.GameObjects.Text;
-  private readonly timerPill: Phaser.GameObjects.Graphics;
-  private readonly timerText: Phaser.GameObjects.Text;
   private readonly metaText: Phaser.GameObjects.Text;
   private readonly bannerText: Phaser.GameObjects.Text;
   private readonly rematchText: Phaser.GameObjects.Text;
@@ -38,16 +35,22 @@ export class MatchHud {
   private readonly celebration: GoalCelebration;
   private readonly onRematch: () => void;
   private readonly online: MatchHudOnlineOpts | null;
+  private readonly audio: GameAudio | null;
   private countdownSeconds: number | null = null;
   private statusHint: string | null = null;
 
   constructor(
     scene: Phaser.Scene,
-    opts: { onRematch: () => void; online?: MatchHudOnlineOpts },
+    opts: {
+      onRematch: () => void;
+      online?: MatchHudOnlineOpts;
+      audio?: GameAudio | null;
+    },
   ) {
     this.scene = scene;
     this.onRematch = opts.onRematch;
     this.online = opts.online ?? null;
+    this.audio = opts.audio ?? null;
     this.celebration = new GoalCelebration(scene);
 
     const { width, hudHeight } = PROTOTYPE_CONFIG.arena;
@@ -98,17 +101,6 @@ export class MatchHud {
       .setOrigin(0.5, 0)
       .setDepth(41);
 
-    this.timerPill = scene.add.graphics().setDepth(41);
-    this.timerText = scene.add
-      .text(field.centerX, u(68), "20s", {
-        fontFamily: FONT,
-        fontSize: `${u(15)}px`,
-        color: "#e2e8f0",
-        fontStyle: "800",
-      })
-      .setOrigin(0.5)
-      .setDepth(42);
-
     this.turnText = scene.add
       .text(width - u(28), u(22), "Player 1 — your turn", {
         fontFamily: FONT,
@@ -119,12 +111,20 @@ export class MatchHud {
       .setOrigin(1, 0)
       .setDepth(41);
 
-    const p1 = this.makePlayerChip("player1", field.centerX - u(168), u(58));
-    const p2 = this.makePlayerChip("player2", field.centerX + u(168), u(58));
-    this.p1Chip = p1.container;
-    this.p2Chip = p2.container;
-    this.p1Name = p1.label;
-    this.p2Name = p2.label;
+    this.plates = {
+      player1: new TurnPlate(
+        scene,
+        "player1",
+        field.centerX - u(168),
+        u(62),
+      ),
+      player2: new TurnPlate(
+        scene,
+        "player2",
+        field.centerX + u(168),
+        u(62),
+      ),
+    };
 
     this.bannerText = scene.add
       .text(field.centerX, field.centerY - u(24), "", {
@@ -195,7 +195,6 @@ export class MatchHud {
     }
 
     scene.input.keyboard?.on("keydown-R", this.onRematchKey, this);
-    this.drawTimerPill(false);
   }
 
   /** Online rematch countdown (3…2…1…0). Null clears. */
@@ -223,11 +222,9 @@ export class MatchHud {
     this.leaveText?.destroy();
     this.bannerText.destroy();
     this.turnText.destroy();
-    this.timerText.destroy();
-    this.timerPill.destroy();
     this.scoreText.destroy();
-    this.p1Chip.destroy();
-    this.p2Chip.destroy();
+    this.plates.player1.destroy();
+    this.plates.player2.destroy();
     this.brandText.destroy();
     this.metaText.destroy();
     this.panel.destroy();
@@ -253,11 +250,11 @@ export class MatchHud {
     } = opts;
 
     this.scoreText.setText(`${score.player1}  —  ${score.player2}`);
-    this.setChipActive(turn.current);
+    this.plates.player1.setActive(turn.current === "player1");
+    this.plates.player2.setActive(turn.current === "player2");
 
     if (this.countdownSeconds !== null) {
-      this.timerText.setText("");
-      this.timerPill.clear();
+      this.clearClocks();
       this.turnText.setText("");
       this.rematchText.setVisible(false);
       this.leaveText?.setVisible(false);
@@ -271,8 +268,7 @@ export class MatchHud {
     }
 
     if (phase === "MATCH_END") {
-      this.timerText.setText("");
-      this.timerPill.clear();
+      this.clearClocks();
       this.turnText.setText("");
       this.showResult(result);
       this.rematchText.setVisible(true);
@@ -285,13 +281,15 @@ export class MatchHud {
     this.bannerText.setVisible(false);
 
     if (phase === "PLAYER_TURN") {
-      this.timerText.setText(timer.format());
-      this.timerText.setColor(timer.urgent ? "#fecaca" : "#e2e8f0");
-      this.drawTimerPill(timer.urgent);
+      this.plates[turn.current].setTime(
+        timer.remainingMs,
+        MATCH_CONFIG.turnDurationMs,
+        {
+          onTick: (secondsLeft) => this.audio?.playTick(secondsLeft),
+        },
+      );
     } else {
-      this.timerText.setText("—");
-      this.timerText.setColor("#64748b");
-      this.drawTimerPill(false);
+      this.clearClocks();
     }
 
     if (awaitingServer) {
@@ -345,52 +343,9 @@ export class MatchHud {
     );
   }
 
-  private makePlayerChip(
-    id: PlayerId,
-    x: number,
-    y: number,
-  ): { container: Phaser.GameObjects.Container; label: Phaser.GameObjects.Text } {
-    const p = MATCH_CONFIG.players[id];
-    const bg = this.scene.add
-      .rectangle(0, 0, u(108), u(32), 0x122033, 0.95)
-      .setStrokeStyle(u(2), p.color, 0.85);
-    const dot = this.scene.add.circle(-u(36), 0, u(7), p.color);
-    const label = this.scene.add
-      .text(-u(18), 0, p.short, {
-        fontFamily: FONT,
-        fontSize: `${u(15)}px`,
-        color: "#f8fafc",
-        fontStyle: "800",
-      })
-      .setOrigin(0, 0.5);
-    const container = this.scene.add
-      .container(x, y, [bg, dot, label])
-      .setDepth(41);
-    return { container, label };
-  }
-
-  private setChipActive(current: PlayerId): void {
-    const scaleActive = 1.08;
-    const scaleIdle = 0.92;
-    this.p1Chip.setScale(current === "player1" ? scaleActive : scaleIdle);
-    this.p2Chip.setScale(current === "player2" ? scaleActive : scaleIdle);
-    this.p1Chip.setAlpha(current === "player1" ? 1 : 0.55);
-    this.p2Chip.setAlpha(current === "player2" ? 1 : 0.55);
-    this.p1Name.setColor(current === "player1" ? "#f0fdfa" : "#94a3b8");
-    this.p2Name.setColor(current === "player2" ? "#fff1f2" : "#94a3b8");
-  }
-
-  private drawTimerPill(urgent: boolean): void {
-    const field = getFieldBounds();
-    const w = u(72);
-    const h = u(28);
-    const x = field.centerX - w / 2;
-    const y = u(68) - h / 2;
-    this.timerPill.clear();
-    this.timerPill.fillStyle(urgent ? 0x7f1d1d : 0x1e293b, 0.95);
-    this.timerPill.fillRoundedRect(x, y, w, h, u(14));
-    this.timerPill.lineStyle(u(2), urgent ? 0xf87171 : 0x334155, 1);
-    this.timerPill.strokeRoundedRect(x, y, w, h, u(14));
+  private clearClocks(): void {
+    this.plates.player1.clearClock();
+    this.plates.player2.clearClock();
   }
 
   private onRematchKey = (): void => {
