@@ -71,10 +71,20 @@
         color: #e2e8f0;
         background: rgba(5, 11, 18, 0.92);
         touch-action: none;
+        max-height: 100dvh;
+        overflow-x: hidden;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
 
       .shell-overlay.is-visible {
         display: flex;
+      }
+
+      /* Lobby must scroll / pan on short iPhone landscape. */
+      #online-lobby.shell-overlay {
+        touch-action: pan-y;
+        justify-content: safe center;
       }
 
       .shell-overlay h1 {
@@ -111,6 +121,47 @@
 
       .shell-overlay .shell-cta:active {
         background: #fde68a;
+      }
+
+      @media (orientation: landscape) and (max-height: 500px) {
+        .shell-overlay {
+          gap: 0.35rem;
+          padding: 0.65rem 1rem;
+          padding-top: max(0.65rem, env(safe-area-inset-top));
+          padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+          justify-content: flex-start;
+        }
+
+        .shell-overlay h1 {
+          font-size: clamp(1.6rem, 8vh, 2.4rem);
+        }
+
+        .shell-overlay p {
+          font-size: 0.85rem;
+        }
+
+        .shell-overlay .shell-cta {
+          margin-top: 0.2rem;
+          padding: 0.55rem 1.1rem;
+          font-size: 0.95rem;
+        }
+
+        .lobby-code {
+          font-size: clamp(1.4rem, 7vh, 2rem) !important;
+          margin: 0 !important;
+        }
+
+        .lobby-server {
+          display: none;
+        }
+
+        #lobby-countdown {
+          font-size: clamp(2rem, 12vh, 3.5rem) !important;
+        }
+
+        .shell-actions {
+          margin-top: 0.2rem;
+        }
       }
 
       #rotate-overlay .shell-icon {
@@ -214,6 +265,22 @@
           disabled
         >
           ONLINE · CHECKING…
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="tap-to-resume"
+      class="shell-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+    >
+      <h1>RESUME</h1>
+      <p>Tap to fix the layout after leaving the app.</p>
+      <div class="shell-actions">
+        <button type="button" class="shell-cta" id="resume-play-btn">
+          TAP TO RESUME
         </button>
       </div>
     </div>
