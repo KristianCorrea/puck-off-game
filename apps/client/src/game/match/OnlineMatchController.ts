@@ -315,7 +315,10 @@ export class OnlineMatchController {
     if (opts.scored && opts.briefGoalFx && state.phase !== "MATCH_END") {
       this.audio.playGoal();
       this.hud.playGoalCelebration();
-      this.goalPauseMs = Math.min(1200, MATCH_CONFIG.goalCelebrationMs);
+      this.goalPauseMs = Math.min(
+        MATCH_CONFIG.onlineGoalHoldMs,
+        MATCH_CONFIG.goalCelebrationMs,
+      );
       this.phase = "GOAL_RESOLUTION";
       this.flick.setEnabled(false);
       return;

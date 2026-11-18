@@ -79,6 +79,11 @@ export const MATCH_CONFIG = {
    * Keeps TURN_RESOLVED payloads small while staying smooth.
    */
   keyframeEverySteps: 2,
+  /**
+   * After a scored shot, clients hold a short celebration before the next turn.
+   * Server pauses the turn clock for this long as well (on top of keyframe duration).
+   */
+  onlineGoalHoldMs: 1_200,
   players: {
     player1: {
       id: "player1" as const,
