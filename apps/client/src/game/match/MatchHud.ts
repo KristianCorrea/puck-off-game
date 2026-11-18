@@ -7,6 +7,10 @@ import {
 import type { MatchPhase, MatchResult, PlayerId } from "../config/gameConfig";
 import { MATCH_CONFIG } from "../config/gameConfig";
 import type { GameAudio } from "../audio/GameAudio";
+import {
+  isFullscreen,
+  toggleFullscreen,
+} from "../../mobile/playShell";
 import { GoalCelebration } from "../ui/GoalCelebration";
 import type { ScoreKeeper } from "./ScoreKeeper";
 import type { MatchTimer } from "./MatchTimer";
@@ -18,7 +22,6 @@ const DISPLAY = '"Teko", "Arial Narrow", Impact, sans-serif';
 
 export type MatchHudOnlineOpts = {
   myPlayerId: PlayerId;
-  onLeave: () => void;
 };
 
 export class MatchHud {
@@ -30,9 +33,12 @@ export class MatchHud {
   private readonly metaText: Phaser.GameObjects.Text;
   private readonly bannerText: Phaser.GameObjects.Text;
   private readonly rematchText: Phaser.GameObjects.Text;
-  private readonly leaveText: Phaser.GameObjects.Text | null;
+  private readonly fullscreenBtn: Phaser.GameObjects.Text;
+  private readonly fullscreenMark: Phaser.GameObjects.Text;
+  private readonly exitBtn: Phaser.GameObjects.Text;
   private readonly celebration: GoalCelebration;
   private readonly onRematch: () => void;
+  private readonly onLeave: () => void;
   private readonly online: MatchHudOnlineOpts | null;
   private readonly audio: GameAudio | null;
   private countdownSeconds: number | null = null;
@@ -42,12 +48,14 @@ export class MatchHud {
     scene: Phaser.Scene,
     opts: {
       onRematch: () => void;
+      onLeave: () => void;
       online?: MatchHudOnlineOpts;
       audio?: GameAudio | null;
     },
   ) {
     this.scene = scene;
     this.onRematch = opts.onRematch;
+    this.onLeave = opts.onLeave;
     this.online = opts.online ?? null;
     this.audio = opts.audio ?? null;
     this.celebration = new GoalCelebration(scene);
@@ -128,19 +136,14 @@ export class MatchHud {
       .setVisible(false);
 
     this.rematchText = scene.add
-      .text(
-        field.centerX - (this.online ? u(90) : 0),
-        field.centerY + u(56),
-        "PLAY AGAIN  ·  R",
-        {
-          fontFamily: FONT,
-          fontSize: `${u(18)}px`,
-          color: "#0f172a",
-          backgroundColor: "#fbbf24",
-          fontStyle: "800",
-          padding: { x: u(28), y: u(16) },
-        },
-      )
+      .text(field.centerX, field.centerY + u(56), "PLAY AGAIN  ·  R", {
+        fontFamily: FONT,
+        fontSize: `${u(18)}px`,
+        color: "#0f172a",
+        backgroundColor: "#fbbf24",
+        fontStyle: "800",
+        padding: { x: u(28), y: u(16) },
+      })
       .setOrigin(0.5)
       .setDepth(51)
       .setVisible(false)
@@ -156,33 +159,68 @@ export class MatchHud {
       this.onRematch();
     });
 
-    if (this.online) {
-      this.leaveText = scene.add
-        .text(field.centerX + u(110), field.centerY + u(56), "LEAVE", {
-          fontFamily: FONT,
-          fontSize: `${u(18)}px`,
-          color: "#e2e8f0",
-          backgroundColor: "#334155",
-          fontStyle: "800",
-          padding: { x: u(28), y: u(16) },
-        })
-        .setOrigin(0.5)
-        .setDepth(51)
-        .setVisible(false)
-        .setInteractive({ useHandCursor: true });
+    // Top-right chrome: ⛶ then Exit Game (exit furthest right).
+    this.exitBtn = scene.add
+      .text(width - u(16), u(12), "Exit Game", {
+        fontFamily: FONT,
+        fontSize: `${u(12)}px`,
+        color: "#e2e8f0",
+        backgroundColor: "#334155",
+        fontStyle: "800",
+        padding: { x: u(12), y: u(8) },
+      })
+      .setOrigin(1, 0)
+      .setDepth(45)
+      .setInteractive({ useHandCursor: true });
 
-      this.leaveText.on("pointerover", () => {
-        this.leaveText?.setStyle({ backgroundColor: "#475569" });
-      });
-      this.leaveText.on("pointerout", () => {
-        this.leaveText?.setStyle({ backgroundColor: "#334155" });
-      });
-      this.leaveText.on("pointerdown", () => {
-        this.online?.onLeave();
-      });
-    } else {
-      this.leaveText = null;
-    }
+    this.exitBtn.on("pointerover", () => {
+      this.exitBtn.setStyle({ backgroundColor: "#475569" });
+    });
+    this.exitBtn.on("pointerout", () => {
+      this.exitBtn.setStyle({ backgroundColor: "#334155" });
+    });
+    this.exitBtn.on("pointerdown", () => {
+      this.onLeave();
+    });
+
+    this.fullscreenBtn = scene.add
+      .text(this.exitBtn.x - this.exitBtn.width - u(8), u(12), "⛶", {
+        fontFamily: FONT,
+        fontSize: `${u(18)}px`,
+        color: "#e2e8f0",
+        backgroundColor: "#1e293b",
+        fontStyle: "700",
+        padding: { x: u(10), y: u(4) },
+      })
+      .setOrigin(1, 0)
+      .setDepth(45)
+      .setInteractive({ useHandCursor: true });
+
+    // × centered on ⛶ when already fullscreen (exit-fullscreen affordance).
+    this.fullscreenMark = scene.add
+      .text(0, 0, "×", {
+        fontFamily: FONT,
+        fontSize: `${u(14)}px`,
+        color: "#f8fafc",
+        fontStyle: "800",
+      })
+      .setOrigin(0.5)
+      .setDepth(46)
+      .setVisible(false);
+
+    this.fullscreenBtn.on("pointerover", () => {
+      this.fullscreenBtn.setStyle({ backgroundColor: "#334155" });
+    });
+    this.fullscreenBtn.on("pointerout", () => {
+      this.fullscreenBtn.setStyle({ backgroundColor: "#1e293b" });
+    });
+    this.fullscreenBtn.on("pointerdown", () => {
+      void toggleFullscreen().then(() => this.syncFullscreenLabel());
+    });
+
+    this.syncFullscreenLabel();
+    document.addEventListener("fullscreenchange", this.onFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", this.onFullscreenChange);
 
     scene.input.keyboard?.on("keydown-R", this.onRematchKey, this);
   }
@@ -206,10 +244,17 @@ export class MatchHud {
   }
 
   destroy(): void {
+    document.removeEventListener("fullscreenchange", this.onFullscreenChange);
+    document.removeEventListener(
+      "webkitfullscreenchange",
+      this.onFullscreenChange,
+    );
     this.scene.input.keyboard?.off("keydown-R", this.onRematchKey, this);
     this.celebration.destroy();
     this.rematchText.destroy();
-    this.leaveText?.destroy();
+    this.fullscreenMark.destroy();
+    this.fullscreenBtn.destroy();
+    this.exitBtn.destroy();
     this.bannerText.destroy();
     this.turnText.destroy();
     this.scoreText.destroy();
@@ -246,7 +291,6 @@ export class MatchHud {
       this.clearClocks();
       this.turnText.setText("");
       this.rematchText.setVisible(false);
-      this.leaveText?.setVisible(false);
       const label =
         this.countdownSeconds > 0
           ? String(this.countdownSeconds)
@@ -261,12 +305,10 @@ export class MatchHud {
       this.turnText.setText("");
       this.showResult(result);
       this.rematchText.setVisible(true);
-      this.leaveText?.setVisible(true);
       return;
     }
 
     this.rematchText.setVisible(false);
-    this.leaveText?.setVisible(false);
     this.bannerText.setVisible(false);
 
     if (phase === "PLAYER_TURN") {
@@ -340,6 +382,20 @@ export class MatchHud {
   private onRematchKey = (): void => {
     if (this.rematchText.visible) this.onRematch();
   };
+
+  private onFullscreenChange = (): void => {
+    this.syncFullscreenLabel();
+  };
+
+  private syncFullscreenLabel(): void {
+    this.fullscreenBtn.setX(this.exitBtn.x - this.exitBtn.width - u(8));
+    const on = isFullscreen();
+    this.fullscreenMark.setVisible(on);
+    this.fullscreenMark.setPosition(
+      this.fullscreenBtn.x - this.fullscreenBtn.width / 2,
+      this.fullscreenBtn.y + this.fullscreenBtn.height / 2,
+    );
+  }
 
   private showResult(result: MatchResult): void {
     let msg = "DRAW";
