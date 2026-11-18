@@ -24,7 +24,6 @@ export type MatchHudOnlineOpts = {
 export class MatchHud {
   private readonly scene: Phaser.Scene;
   private readonly panel: Phaser.GameObjects.Graphics;
-  private readonly brandText: Phaser.GameObjects.Text;
   private readonly plates: Record<PlayerId, TurnPlate>;
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly turnText: Phaser.GameObjects.Text;
@@ -67,20 +66,11 @@ export class MatchHud {
     this.panel.lineStyle(u(1), 0x2dd4bf, 0.25);
     this.panel.lineBetween(0, hudHeight - 1, width, hudHeight - 1);
 
-    this.brandText = scene.add
-      .text(u(28), u(18), "PUCK OFF", {
-        fontFamily: DISPLAY,
-        fontSize: `${u(34)}px`,
-        color: "#e2e8f0",
-        letterSpacing: u(2),
-      })
-      .setOrigin(0, 0)
-      .setDepth(41);
-
+    // Center stack: meta → score → status (plates sit on the flanks).
     this.metaText = scene.add
       .text(
-        u(28),
-        u(54),
+        field.centerX,
+        u(4),
         `FIRST TO ${MATCH_CONFIG.maxGoals}  ·  ${MATCH_CONFIG.turnDurationMs / 1000}S TURNS`,
         {
           fontFamily: FONT,
@@ -89,11 +79,11 @@ export class MatchHud {
           fontStyle: "700",
         },
       )
-      .setOrigin(0, 0)
+      .setOrigin(0.5, 0)
       .setDepth(41);
 
     this.scoreText = scene.add
-      .text(field.centerX, u(10), "0  —  0", {
+      .text(field.centerX, u(16), "0  —  0", {
         fontFamily: DISPLAY,
         fontSize: `${u(56)}px`,
         color: "#f8fafc",
@@ -102,13 +92,13 @@ export class MatchHud {
       .setDepth(41);
 
     this.turnText = scene.add
-      .text(width - u(28), u(22), "Player 1 — your turn", {
+      .text(field.centerX, u(70), "Player 1 — your turn", {
         fontFamily: FONT,
-        fontSize: `${u(16)}px`,
+        fontSize: `${u(14)}px`,
         color: "#2dd4bf",
         fontStyle: "700",
       })
-      .setOrigin(1, 0)
+      .setOrigin(0.5, 0)
       .setDepth(41);
 
     this.plates = {
@@ -225,7 +215,6 @@ export class MatchHud {
     this.scoreText.destroy();
     this.plates.player1.destroy();
     this.plates.player2.destroy();
-    this.brandText.destroy();
     this.metaText.destroy();
     this.panel.destroy();
   }
