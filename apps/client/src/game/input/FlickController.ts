@@ -395,7 +395,23 @@ export class FlickController {
       return;
     }
     const { x, y } = puck.body.position;
-    this.aim.show(x, y, shot.angle, shot.power, puck.sprite.fillColor);
+    // Secondary flick: local stretch from click-hold → finger (not networked).
+    const stretch = this.drag.relativeToGesture
+      ? {
+          fromX: this.drag.originX,
+          fromY: this.drag.originY,
+          toX: worldX,
+          toY: worldY,
+        }
+      : undefined;
+    this.aim.show(
+      x,
+      y,
+      shot.angle,
+      shot.power,
+      puck.sprite.fillColor,
+      stretch,
+    );
     this.opts.onAim?.(puck, shot);
   }
 
